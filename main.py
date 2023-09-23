@@ -70,6 +70,14 @@ def drawLogo(logo):
 	
 	oled.show()
 
+def askQuestion(men):
+	switchMenu(men)
+	while True:
+		if btnOK.value():
+			break
+		checkButtons()
+	return menus[currentMenu]["focus"]
+
 def drawMenu():
 	lineskip = 15
 	oled.fill(0)
@@ -98,12 +106,19 @@ def startMenuItem(item):
 			if btnOK.value():
 				break
 	elif item == 0: # Temp
+		data = ["Zeit,Temperatur"]
+		count = 0
 		while True:
 			if btnOK.value():
+				time.sleep(0.3)
 				break
 			oled.fill(0)
 			oled.text("Temperatursensor", 0, 0)
 			temp = get_temp()
+			count += 1
+			if count % 3 == 0: # with 0.3s sleep, this is every second
+				currentTime = time.localtime() # touple: (year, month, day, hour, minute, second, weekday, yearday)
+				data.append(str(currentTime[3]) + ":" + str(currentTime[4]) + str(currentTime[5]) + "," + str(temp))
 			if temp:
 				oled.text(str(temp) + "*C", 0, 15)
 				gauge(temp, 40, 0, 30, 100, 30)
@@ -111,6 +126,27 @@ def startMenuItem(item):
 				oled.text("Nicht verbunden", 0, 30)
 			oled.show()
 			time.sleep(0.3)
+		shouldSave = askQuestion("save")
+		if shouldSave == 0:
+			oled.fill(0)
+			oled.text("Speichern...", 0, 0)
+			oled.show()
+			currentTime = time.localtime() # touple: (year, month, day, hour, minute, second, weekday, yearday)
+			filename = "results-" + str(currentTime[0]) + "-" + str(currentTime[1]) + "-" + str(currentTime[2]) + "-" + str(currentTime[3]) + "-" + str(currentTime[4]) + str(currentTime[5]) + ".csv"
+			with open(filename, "w") as f:
+				for line in data:
+					f.write(line + "\n")
+				f.close()
+			oled.fill(0)
+			oled.text("Gespeichert unter", 0, 0)
+			oled.text(filename, 0, 15)
+			oled.show()
+			time.sleep(2)
+		else:
+			oled.fill(0)
+			oled.text("Verworfen", 0, 0)
+			oled.show()
+			time.sleep(2)
 	elif item == 1: # pH
 		while True:
 			if btnOK.value():
@@ -130,6 +166,16 @@ def startMenuItem(item):
 	oled.fill(0)
 	oled.show()
 	time.sleep(1.5)
+
+def calculateShift():
+	global menuShift
+	menuShift = int(menus[currentMenu]["focus"] / maxItems) * (lineskip * maxItems)
+
+def switchMenu(to):
+	global currentMenu
+	currentMenu = to
+	calculateShift()
+	drawMenu()
 
 #
 # Main
@@ -160,14 +206,17 @@ def checkButtons():
 		elif menus[currentMenu]["focus"] > len(items) - 1:
 			menus[currentMenu]["focus"] = 0
 		# Shift the menu if needed
-		menuShift = int(menus[currentMenu]["focus"] / maxItems) * (lineskip * maxItems)
+		calculateShift()
 		time.sleep(btnSleep)
 		drawMenu()
 	elif btnOK.value(): # select
+		if currentMenu != "main":
+			return
 		time.sleep(btnSleep)
 		startMenuItem(menus[currentMenu]["focus"])
 		time.sleep(btnSleep)
-		drawMenu()
+		switchMenu("main")
+		# drawMenu()
 
 while True:
 	checkButtons()
