@@ -35,8 +35,6 @@ menus = {
 }
 currentMenu = "main"
 isInMenu = False
-mainMenuItems = ["Temp", "Hello", "World", "Version", "Credits"]
-mainMenuFocus = 0
 
 #
 # Display
@@ -70,9 +68,11 @@ def drawLogo(logo):
 	
 	oled.show()
 
-def drawMenu(items, focusedMenuItem):
+def drawMenu():
 	lineskip = 15
 	oled.fill(0)
+	items = menus[currentMenu]["items"]
+	focusedMenuItem = menus[currentMenu]["focus"]
 	for i, txt in enumerate(items):
 		oled.rect(0, i*lineskip-menuShift, display_width, lineskip, 1 if focusedMenuItem == i else 0, True) # type: ignore
 		oled.text(txt, 5, 5+(i*lineskip)-menuShift, 0 if focusedMenuItem == i else 1)
@@ -83,6 +83,15 @@ def gauge(v, maxv, x, y, w, h):
 	a = a * w
 	oled.rect(x, y, w, h, 1)
 	oled.rect(x, y, int(a), h, 1, True) # type: ignore
+
+def calculateShift():
+	global menuShift
+	menuShift = int(menus[currentMenu]["focus"] / maxItems) * (lineskip * maxItems)
+
+def switchMenu(to):
+	currentMenu = to
+	calculateShift()
+	drawMenu()
 
 def startMenuItem(item):
 	if item == 3: # Version
@@ -140,26 +149,37 @@ while True:
 	if v:
 		break
 
-drawMenu(mainMenuItems, mainMenuFocus)
+isInMenu = True
+drawMenu()
 
 time.sleep(btnSleep)
-while True:
+
+def btnPressed(pressed):
+	global isInMenu
+	if not isInMenu:
+		return
 	isAnyButtonPressed = btnLeft.value() or btnOK.value() or btnRight.value()
 	navigationButton = "up" if btnLeft.value() else "down" if btnRight.value() else None
 	if navigationButton: # up or down
 		# Change the focused menu item
-		mainMenuFocus = mainMenuFocus + (-1 if navigationButton == "up" else 1)
+		menus[currentMenu]["focus"] = menus[currentMenu]["focus"] + (-1 if navigationButton == "up" else 1)
 		# Wrap around if needed
-		if mainMenuFocus < 0:
-			mainMenuFocus = len(mainMenuItems) - 1
-		elif mainMenuFocus > len(mainMenuItems) - 1:
-			mainMenuFocus = 0
+		if menus[currentMenu]["focus"] < 0:
+			menus[currentMenu]["focus"] = len(menus[currentMenu]["items"]) - 1
+		elif menus[currentMenu]["focus"] > len(menus[currentMenu]["items"]) - 1:
+			menus[currentMenu]["focus"] = 0
 		# Shift the menu if needed
-		menuShift = int(mainMenuFocus / maxItems) * (lineskip * maxItems)
+		calculateShift()
 		time.sleep(btnSleep)
-		drawMenu(mainMenuItems, mainMenuFocus)
+		drawMenu()
 	elif btnOK.value(): # select
 		time.sleep(btnSleep)
-		startMenuItem(mainMenuFocus)
+		isInMenu = False
+		startMenuItem(menus[currentMenu]["focus"])
+		isInMenu = True
 		time.sleep(btnSleep)
-		drawMenu(mainMenuItems, mainMenuFocus)
+		drawMenu()
+
+btnLeft.irq(handler=btnPressed, trigger=Pin.IRQ_RISING)
+btnOK.irq(handler=btnPressed, trigger=Pin.IRQ_RISING)
+btnRight.irq(handler=btnPressed, trigger=Pin.IRQ_RISING)
