@@ -23,13 +23,24 @@ btnSleep = 0.3
 menuShift = 0
 maxItems = 4
 # Menus
-mainMenuItems = ["Temp", "Hello", "World", "Version", "Credits"]
-mainMenuFocus = 0
+menus = {
+	"main": { # type: ignore
+		"items": ["Temperatur", "pH-Wert", "World", "Version", "Credits"], # type: ignore
+		"focus": 0 # type: ignore
+	},
+	"save": { # type: ignore
+		"items": ["Speichern", "Verwerfen"], # type: ignore
+		"focus": 0 # type: ignore
+	}
+}
+currentMenu = "main"
+isInMenu = False
 
 #
 # Display
 #
-screen_i2c = I2C(1,scl=Pin(27),sda=Pin(26),freq=200000)  # start I2C on I2C1 (GPIO 26/27)
+# 0x3C i2c address usually, can also rarely be 0x3D
+screen_i2c = I2C(1,scl=Pin(27),sda=Pin(26))  # start I2C on I2C1 (GPIO 26/27)
 # i2c_addr = [hex(ii) for ii in screen_i2c.scan()] # get I2C address in hex format
 # if i2c_addr==[]:
 # 	print('No I2C Display Found') 
@@ -57,9 +68,11 @@ def drawLogo(logo):
 	
 	oled.show()
 
-def drawMenu(items, focusedMenuItem):
+def drawMenu():
 	lineskip = 15
 	oled.fill(0)
+	items = menus[currentMenu]["items"]
+	focusedMenuItem = menus[currentMenu]["focus"]
 	for i, txt in enumerate(items):
 		oled.rect(0, i*lineskip-menuShift, display_width, lineskip, 1 if focusedMenuItem == i else 0, True) # type: ignore
 		oled.text(txt, 5, 5+(i*lineskip)-menuShift, 0 if focusedMenuItem == i else 1)
@@ -70,6 +83,15 @@ def gauge(v, maxv, x, y, w, h):
 	a = a * w
 	oled.rect(x, y, w, h, 1)
 	oled.rect(x, y, int(a), h, 1, True) # type: ignore
+
+def calculateShift():
+	global menuShift
+	menuShift = int(menus[currentMenu]["focus"] / maxItems) * (lineskip * maxItems)
+
+def switchMenu(to):
+	currentMenu = to
+	calculateShift()
+	drawMenu()
 
 def startMenuItem(item):
 	if item == 3: # Version
@@ -87,10 +109,24 @@ def startMenuItem(item):
 			if btnOK.value():
 				break
 			oled.fill(0)
-			oled.text("Temp Sensor", 0, 0)
+			oled.text("Temperatursensor", 0, 0)
 			temp = get_temp()
-			oled.text(str(temp) + "*C", 0, 15)
-			gauge(temp, 40, 0, 30, 100, 30)
+			if temp:
+				oled.text(str(temp) + "*C", 0, 15)
+				gauge(temp, 40, 0, 30, 100, 30)
+			else:
+				oled.text("Nicht verbunden", 0, 30)
+			oled.show()
+			time.sleep(0.3)
+	elif item == 1: # pH
+		while True:
+			if btnOK.value():
+				break
+			oled.fill(0)
+			oled.text("pH-Wert Messung", 0, 0)
+			pH = 0
+			oled.text(str(pH), 0, 15)
+			gauge(pH, 40, 0, 30, 100, 30)
 			oled.show()
 			time.sleep(0.3)
 	else: # Not implemented
@@ -113,26 +149,37 @@ while True:
 	if v:
 		break
 
-drawMenu(mainMenuItems, mainMenuFocus)
+isInMenu = True
+drawMenu()
 
 time.sleep(btnSleep)
-while True:
+
+def btnPressed(pressed):
+	global isInMenu
+	if not isInMenu:
+		return
 	isAnyButtonPressed = btnLeft.value() or btnOK.value() or btnRight.value()
 	navigationButton = "up" if btnLeft.value() else "down" if btnRight.value() else None
 	if navigationButton: # up or down
 		# Change the focused menu item
-		mainMenuFocus = mainMenuFocus + (-1 if navigationButton == "up" else 1)
+		menus[currentMenu]["focus"] = menus[currentMenu]["focus"] + (-1 if navigationButton == "up" else 1)
 		# Wrap around if needed
-		if mainMenuFocus < 0:
-			mainMenuFocus = len(mainMenuItems) - 1
-		elif mainMenuFocus > len(mainMenuItems) - 1:
-			mainMenuFocus = 0
+		if menus[currentMenu]["focus"] < 0:
+			menus[currentMenu]["focus"] = len(menus[currentMenu]["items"]) - 1
+		elif menus[currentMenu]["focus"] > len(menus[currentMenu]["items"]) - 1:
+			menus[currentMenu]["focus"] = 0
 		# Shift the menu if needed
-		menuShift = int(mainMenuFocus / maxItems) * (lineskip * maxItems)
+		calculateShift()
 		time.sleep(btnSleep)
-		drawMenu(mainMenuItems, mainMenuFocus)
+		drawMenu()
 	elif btnOK.value(): # select
 		time.sleep(btnSleep)
-		startMenuItem(mainMenuFocus)
+		isInMenu = False
+		startMenuItem(menus[currentMenu]["focus"])
+		isInMenu = True
 		time.sleep(btnSleep)
-		drawMenu(mainMenuItems, mainMenuFocus)
+		drawMenu()
+
+btnLeft.irq(handler=btnPressed, trigger=Pin.IRQ_RISING)
+btnOK.irq(handler=btnPressed, trigger=Pin.IRQ_RISING)
+btnRight.irq(handler=btnPressed, trigger=Pin.IRQ_RISING)
