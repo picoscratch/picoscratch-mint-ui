@@ -1,8 +1,9 @@
-from machine import Pin, I2C, ADC
+from machine import Pin, I2C, ADC, PWM
 from ssd1306 import SSD1306_I2C
 import framebuf,sys
 import time
 from psds1820 import get_temp
+import dftds # TDS/ppm library
 
 #
 # Pins
@@ -25,7 +26,7 @@ maxItems = 4
 # Menus
 menus = {
 	"main": { # type: ignore
-		"items": ["Temperatur", "pH-Wert", "World", "Version", "Credits"], # type: ignore
+		"items": ["Temperatur", "Wasserqualitaet", "...", "Version", "Credits"], # type: ignore
 		"focus": 0 # type: ignore
 	},
 	"save": { # type: ignore
@@ -56,6 +57,12 @@ oled = SSD1306_I2C(display_width, display_height, screen_i2c) # oled controller
 #
 # Functions
 #
+def max4466():
+	analog_value = ADC(28)
+	conversion_factor =3.3/(65536)
+	reading = analog_value.read_u16()*conversion_factor
+	return reading
+
 def drawLogo(logo):
 	fb = framebuf.FrameBuffer(logo, 64, 64, framebuf.MONO_HLSB)
 
@@ -132,7 +139,7 @@ def startMenuItem(item):
 			oled.text("Speichern...", 0, 0)
 			oled.show()
 			currentTime = time.localtime() # touple: (year, month, day, hour, minute, second, weekday, yearday)
-			filename = "results-" + str(currentTime[0]) + "-" + str(currentTime[1]) + "-" + str(currentTime[2]) + "-" + str(currentTime[3]) + "-" + str(currentTime[4]) + str(currentTime[5]) + ".csv"
+			filename = "t-" + str(currentTime[0]) + "-" + str(currentTime[1]) + "-" + str(currentTime[2]) + "-" + str(currentTime[3]) + "-" + str(currentTime[4]) + str(currentTime[5]) + ".csv"
 			with open(filename, "w") as f:
 				for line in data:
 					f.write(line + "\n")
@@ -147,15 +154,33 @@ def startMenuItem(item):
 			oled.text("Verworfen", 0, 0)
 			oled.show()
 			time.sleep(2)
-	elif item == 1: # pH
+	elif item == 1: # PPM
 		while True:
 			if btnOK.value():
 				break
 			oled.fill(0)
-			oled.text("pH-Wert Messung", 0, 0)
-			pH = 0
-			oled.text(str(pH), 0, 15)
-			gauge(pH, 40, 0, 30, 100, 30)
+			oled.text("PPM Messung", 0, 0)
+			tds_sensor = dftds.GravityTDS(28, adc_range=65535, k_value_repository=dftds.KValueRepositoryFlash("tds_calibration.json"))
+			tds_sensor.begin()
+			tds_sensor.temperature = get_temp() # type: ignore
+			tds_value = tds_sensor.update()
+			oled.text(str(tds_value) + "ppm", 0, 15)
+			gauge(tds_value, 500, 0, 30, 100, 30)
+			oled.show()
+			time.sleep(0.3)
+	elif item == 2: # mic
+		while True:
+			if btnOK.value():
+				break
+			oled.fill(0)
+			oled.text("Lautstärke", 0, 0)
+			vol = max4466()
+			if int(vol) >= 2:
+				vol = 1
+			else:
+				vol = 0
+			oled.text(str(vol), 0, 15)
+			gauge(vol, 3, 0, 30, 100, 30) # type: ignore
 			oled.show()
 			time.sleep(0.3)
 	else: # Not implemented
