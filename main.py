@@ -4,6 +4,7 @@ import framebuf,sys
 import time
 from psds1820 import get_temp
 import dftds # TDS/ppm library
+import network
 
 #
 # Pins
@@ -26,7 +27,7 @@ maxItems = 4
 # Menus
 menus = {
 	"main": { # type: ignore
-		"items": ["Temperatur", "Wasserqualitaet", "Panels", "Einstellungen", "Version", "Credits"], # type: ignore
+		"items": ["Temperatur", "Wasserqualitaet", "Panels", "Einstellungen", "Version", "Networking"], # type: ignore
 		"focus": 0 # type: ignore
 	},
 	"save": { # type: ignore
@@ -39,6 +40,10 @@ menus = {
 	},
 	"settings": { # type: ignore
 		"items": ["ppm kalibrieren"], # type: ignore
+		"focus": 0 # type: ignore
+	},
+	"aps": { # type: ignore
+		"items": [], # type: ignore
 		"focus": 0 # type: ignore
 	}
 }
@@ -61,6 +66,13 @@ screen_i2c = I2C(1,scl=Pin(27),sda=Pin(26))  # start I2C on I2C1 (GPIO 26/27)
 # 	print("I2C Configuration: {}".format(screen_i2c)) # print I2C params
 
 oled = SSD1306_I2C(display_width, display_height, screen_i2c) # oled controller
+
+#
+# Networking
+#
+network.country("DE")
+network.hostname("picoscratchmint")
+nic = network.WLAN(network.STA_IF)
 
 #
 # Functions
@@ -207,6 +219,50 @@ def startMenuItem(item):
 			# oled.text("Kalibriert", 0, 0)
 			# oled.show()
 			# time.sleep(2)
+	elif item == 5: # networking
+		# oled.fill(0)
+		# oled.text("Scanning...", 0, 0)
+		# oled.show()
+		# nic.active(True)
+		# aps = nic.scan()
+		# print(len(aps))
+		# menus["aps"]["items"] = []
+		# menus["aps"]["focus"] = 0
+		# for ap in aps:
+		# 	menus["aps"]["items"].append(ap[0].decode("utf-8") + " " + str(ap[3]) + "dBm")
+		# ap = askQuestion("aps")
+		# ap = menus["aps"]["items"][ap]
+		# ap = ap.split(" ")
+		# ap.pop()
+		# ap = " ".join(ap)
+		# oled.fill(0)
+		# oled.text("Connecting...", 0, 0)
+		# oled.show()
+		# nic.connect(ap, "88888888")
+		import config
+		oled.fill(0)
+		oled.text("Connecting...", 0, 0)
+		oled.show()
+		nic.active(True)
+		time.sleep(1)
+		print(config.ssid, config.password)
+		nic.connect(ssid=config.ssid, key=config.password)
+		while nic.status() == network.STAT_CONNECTING:
+			pass
+		oled.fill(0)
+		if nic.status() == network.STAT_GOT_IP:
+			ip = nic.ifconfig()[0]
+			oled.text("Connected", 0, 0)
+			oled.text(ip, 0, 15)
+		elif nic.status() == network.STAT_WRONG_PASSWORD:
+			oled.text("Wrong password", 0, 0)
+		elif nic.status() == network.STAT_NO_AP_FOUND:
+			oled.text("No AP found", 0, 0)
+		elif nic.status() == network.STAT_CONNECT_FAIL:
+			oled.text("Connection failed", 0, 0)
+		print(nic.status())
+		oled.show()
+		time.sleep(3)
 	else: # Not implemented
 		oled.fill(0)
 		oled.text("Not Implemented", 0, 0)
