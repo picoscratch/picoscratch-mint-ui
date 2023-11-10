@@ -26,11 +26,19 @@ maxItems = 4
 # Menus
 menus = {
 	"main": { # type: ignore
-		"items": ["Temperatur", "Wasserqualitaet", "...", "Version", "Credits"], # type: ignore
+		"items": ["Temperatur", "Wasserqualitaet", "Panels", "Einstellungen", "Version", "Credits"], # type: ignore
 		"focus": 0 # type: ignore
 	},
 	"save": { # type: ignore
 		"items": ["Speichern", "Verwerfen"], # type: ignore
+		"focus": 0 # type: ignore
+	},
+	"sensors": { # type: ignore
+		"items": ["temp", "ppm"], # type: ignore
+		"focus": 0 # type: ignore
+	},
+	"settings": { # type: ignore
+		"items": ["ppm kalibrieren"], # type: ignore
 		"focus": 0 # type: ignore
 	}
 }
@@ -79,6 +87,7 @@ def drawLogo(logo):
 
 def askQuestion(men):
 	switchMenu(men)
+	time.sleep(btnSleep)
 	while True:
 		if btnOK.value():
 			break
@@ -102,7 +111,7 @@ def gauge(v, maxv, x, y, w, h):
 	oled.rect(x, y, int(a), h, 1, True) # type: ignore
 
 def startMenuItem(item):
-	if item == 3: # Version
+	if item == 4: # Version
 		oled.fill(0)
 		oled.text("PicoScratch", 0, 0)
 		oled.text("MINT Koffer", 0, 15)
@@ -168,21 +177,36 @@ def startMenuItem(item):
 			gauge(tds_value, 500, 0, 30, 100, 30)
 			oled.show()
 			time.sleep(0.3)
-	elif item == 2: # mic
+	elif item == 2: # panels
 		while True:
-			if btnOK.value():
-				break
-			oled.fill(0)
-			oled.text("Lautstärke", 0, 0)
-			vol = max4466()
-			if int(vol) >= 2:
-				vol = 1
-			else:
-				vol = 0
-			oled.text(str(vol), 0, 15)
-			gauge(vol, 3, 0, 30, 100, 30) # type: ignore
-			oled.show()
-			time.sleep(0.3)
+			drawPanels()
+			handlePanelButtons()
+	# elif item == 3: # settings
+		# pass
+		# sett = askQuestion("settings")
+		# if sett == 0: # ppm calibration
+			# oled.fill(0)
+			# oled.text("ppm Kalibrierung", 0, 0)
+			# oled.text("Bitte in 100ppm Wasser", 0, 15)
+			# oled.text("Wasser tauchen", 0, 30)
+			# oled.text("und OK druecken", 0, 45)
+			# oled.show()
+			# time.sleep(2)
+			# while True:
+			# 	if btnOK.value():
+			# 		break
+			# oled.fill(0)
+			# oled.text("Kalibriere...", 0, 0)
+			# oled.show()
+			# tds_sensor = dftds.GravityTDS(28, adc_range=65535, k_value_repository=dftds.KValueRepositoryFlash("tds_calibration.json"))
+			# tds_sensor.temperature = get_temp() # type: ignore
+			# tds_sensor.begin()
+			# tds_sensor.update()
+			# tds_sensor.calibrate(100)
+			# oled.fill(0)
+			# oled.text("Kalibriert", 0, 0)
+			# oled.show()
+			# time.sleep(2)
 	else: # Not implemented
 		oled.fill(0)
 		oled.text("Not Implemented", 0, 0)
@@ -201,6 +225,77 @@ def switchMenu(to):
 	currentMenu = to
 	calculateShift()
 	drawMenu()
+
+def invertArea(x, y, w, h):
+	for i in range(w):
+		for j in range(h):
+			oled.pixel(x+i, y+j, not oled.pixel(x+i, y+j))
+
+panels = ["temp", "temp", "add"]
+selectedPanel = 0
+panelheight = 30
+
+def drawPanels():
+	oled.fill(0)
+	for i, panel in enumerate(panels):
+		h = i*panelheight + 2
+		# if i > 0:
+		# 	h = h + 3
+		# scroll the height away depending on the selected panel
+		h = h - (selectedPanel * panelheight)
+		if selectedPanel % 2 != 0:
+			h = h + panelheight
+		
+		oled.rect(0, h, display_width, panelheight, 1)
+
+		if panel == "add":
+			oled.text("Neuer Sensor...", 5, 5+h, 1)
+		else:
+			oled.text(panel, 5, 5+h, 1)
+			# centered text
+			value = 0
+			unit = ""
+			if panel == "temp":
+				value = get_temp()
+				unit = "*C"
+			elif panel == "ppm":
+				tds_sensor = dftds.GravityTDS(28, adc_range=65535, k_value_repository=dftds.KValueRepositoryFlash("tds_calibration.json"))
+				tds_sensor.begin()
+				tds_sensor.temperature = get_temp() # type: ignore
+				value = tds_sensor.update()
+				unit = "ppm"
+			text = str(value) + unit
+			# right aligned, every char is 8px wide
+			oled.text(text, display_width - (len(text) * 8) - 5, 5+h, 1)
+
+			gauge(value, 40, 5, 5+h+10, display_width - 10, 10)
+		
+		if i == selectedPanel:
+			invertArea(0, h, display_width, panelheight)
+	oled.show()
+
+def handlePanelButtons():
+	global selectedPanel
+	if btnLeft.value():
+		selectedPanel = selectedPanel - 1
+		if selectedPanel < 0:
+			selectedPanel = len(panels) - 1
+		drawPanels()
+		time.sleep(btnSleep)
+	elif btnRight.value():
+		selectedPanel = selectedPanel + 1
+		if selectedPanel > len(panels) - 1:
+			selectedPanel = 0
+		drawPanels()
+		time.sleep(btnSleep)
+	elif btnOK.value():
+		if panels[selectedPanel] == "add":
+			sensor = menus["sensors"]["items"][askQuestion("sensors")]
+			panels.insert(len(panels) - 1, sensor)
+		else:
+			panels.pop(selectedPanel)
+		drawPanels()
+		time.sleep(btnSleep)
 
 #
 # Main
