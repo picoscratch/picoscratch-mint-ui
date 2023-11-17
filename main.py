@@ -78,6 +78,27 @@ nic = network.WLAN(network.STA_IF)
 #
 # Functions
 #
+def get_tds():
+	try:
+		tds_sensor = dftds.GravityTDS(28, adc_range=65535, k_value_repository=dftds.KValueRepositoryFlash("tds_calibration.json"))
+		tds_sensor.begin()
+		temp = get_temp()
+		if temp == None:
+			# tds_sensor.temperature = 25
+			return None
+		# else:
+		tds_sensor.temperature = temp
+		# tds_sensor.temperature = get_temp() # type: ignore
+		tds_value = tds_sensor.update()
+		return float('{0:.2g}'.format(tds_value))
+	except:
+		return None
+
+sensors = {
+	"temp": get_temp, # type: ignore
+	"ppm": get_tds # type: ignore
+}
+
 def max4466():
 	analog_value = ADC(28)
 	conversion_factor =3.3/(65536)
@@ -182,12 +203,12 @@ def startMenuItem(item):
 				break
 			oled.fill(0)
 			oled.text("PPM Messung", 0, 0)
-			tds_sensor = dftds.GravityTDS(28, adc_range=65535, k_value_repository=dftds.KValueRepositoryFlash("tds_calibration.json"))
-			tds_sensor.begin()
-			tds_sensor.temperature = get_temp() # type: ignore
-			tds_value = tds_sensor.update()
-			oled.text(str(tds_value) + "ppm", 0, 15)
-			gauge(tds_value, 500, 0, 30, 100, 30)
+			tds_value = get_tds()
+			if tds_value:
+				oled.text(str(tds_value) + "ppm", 0, 15)
+				gauge(tds_value, 500, 0, 30, 100, 30)
+			else:
+				oled.text("Nicht verbunden", 0, 30)
 			oled.show()
 			time.sleep(0.3)
 	elif item == 2: # panels
@@ -294,7 +315,7 @@ def invertArea(x, y, w, h):
 		for j in range(h):
 			oled.pixel(x+i, y+j, not oled.pixel(x+i, y+j))
 
-panels = ["temp", "temp", "add"]
+panels = ["temp", "ppm", "add"]
 selectedPanel = 0
 panelheight = 30
 
@@ -322,17 +343,17 @@ def drawPanels():
 				value = get_temp()
 				unit = "*C"
 			elif panel == "ppm":
-				tds_sensor = dftds.GravityTDS(28, adc_range=65535, k_value_repository=dftds.KValueRepositoryFlash("tds_calibration.json"))
-				tds_sensor.begin()
-				tds_sensor.temperature = get_temp() # type: ignore
-				value = tds_sensor.update()
+				value = get_tds()
 				unit = "ppm"
-			text = str(value) + unit
-			# right aligned, every char is 8px wide
-			oled.text(text, display_width - (len(text) * 8) - 5, 5+h, 1)
+			
+			if value == None:
+				oled.text("Nicht verbunden", 5, 5+h+10, 1)
+			else:
+				text = str(value) + unit
+				# right aligned, every char is 8px wide
+				oled.text(text, display_width - (len(text) * 8) - 5, 5+h, 1)
 
-			gauge(value, 40, 5, 5+h+10, display_width - 10, 10)
-		
+				gauge(value, 40, 5, 5+h+10, display_width - 10, 10)
 		if i == selectedPanel:
 			invertArea(0, h, display_width, panelheight)
 	oled.show()
@@ -377,10 +398,7 @@ def serialThread():
 		except:
 			temp = last_temp
 		try:
-			tds_sensor = dftds.GravityTDS(28, adc_range=65535, k_value_repository=dftds.KValueRepositoryFlash("tds_calibration.json"))
-			tds_sensor.begin()
-			tds_sensor.temperature = get_temp() # type: ignore
-			tds_value = tds_sensor.update()
+			tds_value = get_tds()
 			last_ppm = tds_value
 		except:
 			tds_value = last_ppm
