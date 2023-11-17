@@ -5,6 +5,7 @@ import time
 from psds1820 import get_temp
 import dftds # TDS/ppm library
 import network
+import _thread
 
 #
 # Pins
@@ -27,7 +28,7 @@ maxItems = 4
 # Menus
 menus = {
 	"main": { # type: ignore
-		"items": ["Temperatur", "Wasserqualitaet", "Panels", "Einstellungen", "Version", "Networking"], # type: ignore
+		"items": ["Temperatur", "Wasserqualitaet", "Panels", "Einstellungen", "Version", "Networking", "Enable Serial"], # type: ignore
 		"focus": 0 # type: ignore
 	},
 	"save": { # type: ignore
@@ -35,7 +36,7 @@ menus = {
 		"focus": 0 # type: ignore
 	},
 	"sensors": { # type: ignore
-		"items": ["temp", "ppm"], # type: ignore
+		"items": ["temp", "ppm", "exit"], # type: ignore
 		"focus": 0 # type: ignore
 	},
 	"settings": { # type: ignore
@@ -192,7 +193,8 @@ def startMenuItem(item):
 	elif item == 2: # panels
 		while True:
 			drawPanels()
-			handlePanelButtons()
+			if not handlePanelButtons():
+				break
 	# elif item == 3: # settings
 		# pass
 		# sett = askQuestion("settings")
@@ -263,6 +265,11 @@ def startMenuItem(item):
 		print(nic.status())
 		oled.show()
 		time.sleep(3)
+	elif item == 6: # enable serial
+		_thread.start_new_thread(serialThread, ())
+		# remove the menu item
+		menus["main"]["items"].pop(6)
+		menus["main"]["focus"] = 0
 	else: # Not implemented
 		oled.fill(0)
 		oled.text("Not Implemented", 0, 0)
@@ -347,11 +354,40 @@ def handlePanelButtons():
 	elif btnOK.value():
 		if panels[selectedPanel] == "add":
 			sensor = menus["sensors"]["items"][askQuestion("sensors")]
+			if sensor == "exit":
+				return False
 			panels.insert(len(panels) - 1, sensor)
 		else:
 			panels.pop(selectedPanel)
 		drawPanels()
 		time.sleep(btnSleep)
+	return True
+
+#
+# Serial Thread
+#
+def serialThread():
+	last_temp = -1
+	last_ppm = -1
+	# this threads job is printing json data to the serial port, all sensors are polled here
+	while True:
+		try:
+			temp = get_temp()
+			last_temp = temp
+		except:
+			temp = last_temp
+		try:
+			tds_sensor = dftds.GravityTDS(28, adc_range=65535, k_value_repository=dftds.KValueRepositoryFlash("tds_calibration.json"))
+			tds_sensor.begin()
+			tds_sensor.temperature = get_temp() # type: ignore
+			tds_value = tds_sensor.update()
+			last_ppm = tds_value
+		except:
+			tds_value = last_ppm
+		print("{\"temp\":" + str(temp) + ",\"ppm\":" + str(tds_value) + "}")
+		time.sleep(1)
+
+# _thread.start_new_thread(serialThread, ())
 
 #
 # Main
