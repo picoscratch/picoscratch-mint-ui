@@ -12,7 +12,7 @@ def get_temp():
 	ds_sensor.convert_temp()
 	try:
 		temp = ds_sensor.read_temp(roms[0])
-		return float('{0:.2f}'.format(temp))
+		return float('{0:.2g}'.format(temp))
 	except:
 		return None
 

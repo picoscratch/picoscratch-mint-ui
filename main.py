@@ -6,6 +6,7 @@ from psds1820 import get_temp
 import dftds # TDS/ppm library
 import network
 import _thread
+from mh_z19 import MH_Z19
 
 #
 # Pins
@@ -13,6 +14,15 @@ import _thread
 btnLeft = Pin(0, Pin.IN, Pin.PULL_DOWN)
 btnOK = Pin(1, Pin.IN, Pin.PULL_DOWN)
 btnRight = Pin(3, Pin.IN, Pin.PULL_DOWN)
+ledRed = PWM(Pin(4))
+ledYellow = Pin(5, Pin.OUT)
+ledGreen = Pin(6, Pin.OUT)
+
+ledRed.freq(8)
+
+ledRed.duty_u16(0)
+ledYellow.off()
+ledGreen.off()
 
 #
 # Constants
@@ -28,7 +38,7 @@ maxItems = 4
 # Menus
 menus = {
 	"main": { # type: ignore
-		"items": ["Temperatur", "Wasserqualitaet", "Panels", "Einstellungen", "Version", "Networking", "Enable Serial"], # type: ignore
+		"items": ["Temperatur", "Wasserqualitaet", "Panels", "Einstellungen", "Version", "Netzwerkausgang", "USB-Ausgang"], # type: ignore
 		"focus": 0 # type: ignore
 	},
 	"save": { # type: ignore
@@ -36,7 +46,7 @@ menus = {
 		"focus": 0 # type: ignore
 	},
 	"sensors": { # type: ignore
-		"items": ["temp", "ppm", "exit"], # type: ignore
+		"items": ["temp", "ppm", "co2", "exit"], # type: ignore
 		"focus": 0 # type: ignore
 	},
 	"settings": { # type: ignore
@@ -94,9 +104,44 @@ def get_tds():
 	except:
 		return None
 
+def read_co2():
+	sensor = MH_Z19(Pin(8), Pin(9), 1)
+	return sensor.read_co2()
+
 sensors = {
-	"temp": get_temp, # type: ignore
-	"ppm": get_tds # type: ignore
+	"temp": { # type: ignore
+		"read": get_temp, # type: ignore
+		"unit": "*C", # type: ignore
+		"min": -10, # type: ignore
+		"max": 40, # type: ignore
+		"friendlyName": "Temp.", # type: ignore
+		"toolow": 10, # type: ignore
+		"good": 20, # type: ignore
+		"warn": 30, # type: ignore
+		"bad": 40 # type: ignore
+	},
+	"ppm": { # type: ignore
+		"read": get_tds, # type: ignore
+		"unit": "ppm", # type: ignore
+		"min": 0, # type: ignore
+		"max": 500, # type: ignore
+		"friendlyName": "ppm", # type: ignore
+		"toolow": 70, # type: ignore
+		"good": 80, # type: ignore
+		"warn": 200, # type: ignore
+		"bad": 400 # type: ignore
+	}, # type: ignore
+	"co2": { # type: ignore
+		"read": read_co2, # type: ignore
+		"unit": "ppm", # type: ignore
+		"min": 300, # type: ignore ######################## TODO: change these values to sth better
+		"max": 2200, # type: ignore
+		"friendlyName": "CO2", # type: ignore
+		"toolow": 0, # type: ignore
+		"good": 400, # type: ignore
+		"warn": 1300, # type: ignore
+		"bad": 1700 # type: ignore
+	}
 }
 
 def max4466():
@@ -104,6 +149,25 @@ def max4466():
 	conversion_factor =3.3/(65536)
 	reading = analog_value.read_u16()*conversion_factor
 	return reading
+
+def trafficLight(value, goodlvl, warnlvl, badlvl, toolowlvl=0):
+	on = 65535
+	if value <= toolowlvl or value < goodlvl:
+		ledRed.duty_u16(int(on/2)) # on
+		ledYellow.off() # on
+		ledGreen.off()
+	elif value >= goodlvl and value < warnlvl:
+		ledRed.duty_u16(0)
+		ledYellow.off()
+		ledGreen.on()
+	elif value >= warnlvl and value < badlvl:
+		ledRed.duty_u16(0)
+		ledYellow.on()
+		ledGreen.off()
+	elif value >= badlvl:
+		ledRed.duty_u16(on)
+		ledYellow.off()
+		ledGreen.off()
 
 def drawLogo(logo):
 	fb = framebuf.FrameBuffer(logo, 64, 64, framebuf.MONO_HLSB)
@@ -138,11 +202,11 @@ def drawMenu():
 		oled.text(txt, 5, 5+(i*lineskip)-menuShift, 0 if focusedMenuItem == i else 1)
 	oled.show()
 
-def gauge(v, maxv, x, y, w, h):
-	a = v / maxv
+def gauge(v, maxv, x, y, w, h, minv=0):
+	a = (v - minv) / (maxv - minv)
 	a = a * w
 	oled.rect(x, y, w, h, 1)
-	oled.rect(x, y, int(a), h, 1, True) # type: ignore
+	oled.rect(x, y, int(a), h, 1, True)  # type: ignore
 
 def startMenuItem(item):
 	if item == 4: # Version
@@ -171,7 +235,8 @@ def startMenuItem(item):
 				data.append(str(currentTime[3]) + ":" + str(currentTime[4]) + str(currentTime[5]) + "," + str(temp))
 			if temp:
 				oled.text(str(temp) + "*C", 0, 15)
-				gauge(temp, 40, 0, 30, 100, 30)
+				gauge(temp, 40, 0, 30, 100, 30, -10)
+				trafficLight(temp, sensors["temp"]["good"], sensors["temp"]["warn"], sensors["temp"]["bad"], sensors["temp"]["toolow"])
 			else:
 				oled.text("Nicht verbunden", 0, 30)
 			oled.show()
@@ -207,6 +272,7 @@ def startMenuItem(item):
 			if tds_value:
 				oled.text(str(tds_value) + "ppm", 0, 15)
 				gauge(tds_value, 500, 0, 30, 100, 30)
+				trafficLight(tds_value, sensors["ppm"]["good"], sensors["ppm"]["warn"], sensors["ppm"]["bad"], sensors["ppm"]["toolow"])
 			else:
 				oled.text("Nicht verbunden", 0, 30)
 			oled.show()
@@ -262,35 +328,37 @@ def startMenuItem(item):
 		# oled.text("Connecting...", 0, 0)
 		# oled.show()
 		# nic.connect(ap, "88888888")
-		import config
-		oled.fill(0)
-		oled.text("Connecting...", 0, 0)
-		oled.show()
-		nic.active(True)
-		time.sleep(1)
-		print(config.ssid, config.password)
-		nic.connect(ssid=config.ssid, key=config.password)
-		while nic.status() == network.STAT_CONNECTING:
-			pass
-		oled.fill(0)
-		if nic.status() == network.STAT_GOT_IP:
-			ip = nic.ifconfig()[0]
-			oled.text("Connected", 0, 0)
-			oled.text(ip, 0, 15)
-		elif nic.status() == network.STAT_WRONG_PASSWORD:
-			oled.text("Wrong password", 0, 0)
-		elif nic.status() == network.STAT_NO_AP_FOUND:
-			oled.text("No AP found", 0, 0)
-		elif nic.status() == network.STAT_CONNECT_FAIL:
-			oled.text("Connection failed", 0, 0)
-		print(nic.status())
-		oled.show()
-		time.sleep(3)
+		# import config
+		# oled.fill(0)
+		# oled.text("Connecting...", 0, 0)
+		# oled.show()
+		# nic.active(True)
+		# time.sleep(1)
+		# print(config.ssid, config.password)
+		# nic.connect(ssid=config.ssid, key=config.password)
+		# while nic.status() == network.STAT_CONNECTING:
+		# 	pass
+		# oled.fill(0)
+		# if nic.status() == network.STAT_GOT_IP:
+		# 	ip = nic.ifconfig()[0]
+		# 	oled.text("Connected", 0, 0)
+		# 	oled.text(ip, 0, 15)
+		# elif nic.status() == network.STAT_WRONG_PASSWORD:
+		# 	oled.text("Wrong password", 0, 0)
+		# elif nic.status() == network.STAT_NO_AP_FOUND:
+		# 	oled.text("No AP found", 0, 0)
+		# elif nic.status() == network.STAT_CONNECT_FAIL:
+		# 	oled.text("Connection failed", 0, 0)
+		# print(nic.status())
+		# oled.show()
+		# time.sleep(3)
+		networkOutput()
 	elif item == 6: # enable serial
-		_thread.start_new_thread(serialThread, ())
+		# _thread.start_new_thread(serialThread, ())
 		# remove the menu item
-		menus["main"]["items"].pop(6)
-		menus["main"]["focus"] = 0
+		# menus["main"]["items"].pop(6)
+		# menus["main"]["focus"] = 0
+		serialThread()
 	else: # Not implemented
 		oled.fill(0)
 		oled.text("Not Implemented", 0, 0)
@@ -315,7 +383,7 @@ def invertArea(x, y, w, h):
 		for j in range(h):
 			oled.pixel(x+i, y+j, not oled.pixel(x+i, y+j))
 
-panels = ["temp", "ppm", "add"]
+panels = ["temp", "co2", "add"]
 selectedPanel = 0
 panelheight = 30
 
@@ -335,17 +403,27 @@ def drawPanels():
 		if panel == "add":
 			oled.text("Neuer Sensor...", 5, 5+h, 1)
 		else:
-			oled.text(panel, 5, 5+h, 1)
-			# centered text
 			value = 0
 			unit = ""
-			if panel == "temp":
-				value = get_temp()
-				unit = "*C"
-			elif panel == "ppm":
-				value = get_tds()
-				unit = "ppm"
+			min = 0
+			max = 0
+			friendlyName = panel
+			if panel in sensors:
+				value = sensors[panel]["read"]()
+				unit = sensors[panel]["unit"]
+				min = sensors[panel]["min"]
+				max = sensors[panel]["max"]
+				friendlyName = sensors[panel]["friendlyName"] if "friendlyName" in sensors[panel] else panel
+				if i == selectedPanel:
+					if value == None:
+						ledRed.duty_u16(0)
+						ledYellow.off()
+						ledGreen.off()
+					else:
+						trafficLight(value, sensors[panel]["good"], sensors[panel]["warn"], sensors[panel]["bad"], sensors[panel]["toolow"])
 			
+			oled.text(friendlyName, 5, 5+h, 1)
+
 			if value == None:
 				oled.text("Nicht verbunden", 5, 5+h+10, 1)
 			else:
@@ -353,7 +431,7 @@ def drawPanels():
 				# right aligned, every char is 8px wide
 				oled.text(text, display_width - (len(text) * 8) - 5, 5+h, 1)
 
-				gauge(value, 40, 5, 5+h+10, display_width - 10, 10)
+				gauge(value, max, 5, 5+h+10, display_width - 10, 10, min)
 		if i == selectedPanel:
 			invertArea(0, h, display_width, panelheight)
 	oled.show()
@@ -390,6 +468,11 @@ def handlePanelButtons():
 def serialThread():
 	last_temp = -1
 	last_ppm = -1
+	oled.fill(0)
+	oled.text("Daten ueber USB", 0, 0, 1)
+	oled.text("OK zum beenden", 0, 10, 1)
+	oled.show()
+	time.sleep(1)
 	# this threads job is printing json data to the serial port, all sensors are polled here
 	while True:
 		try:
@@ -403,7 +486,12 @@ def serialThread():
 		except:
 			tds_value = last_ppm
 		print("{\"temp\":" + str(temp) + ",\"ppm\":" + str(tds_value) + "}")
+		if btnOK.value():
+			break
 		time.sleep(1)
+
+def networkOutput():
+	pass
 
 # _thread.start_new_thread(serialThread, ())
 
