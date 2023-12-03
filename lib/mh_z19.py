@@ -6,9 +6,9 @@ from machine import UART, Pin
 from utime import sleep
 import struct
 
-UART_TX_PIN = 0
-UART_RX_PIN = 1
-UART_ID = 0
+UART_TX_PIN = 8
+UART_RX_PIN = 9
+UART_ID = 1
 BAUD_RATE = 9600  # according to manual
 DATA_BIT = 8  # 8 bytes according to manual
 STOP_BIT = 1  # 1 byte according to manual
@@ -27,7 +27,7 @@ class MH_Z19:
 	The MH_Z19C sensor's datasheet can be found at
 	https://www.winsen-sensor.com/d/files/infrared-gas-sensor/mh-z19c-pins-type-co2-manual-ver1_0.pdf
 	"""
-	RETRY_COUNT = 1 # was: 5
+	RETRY_COUNT = 5 # was: 5
 
 	def __init__(self, tx_pin: Pin, rx_pin: Pin, uart_id=0):
 		self.sensor = UART(uart_id, baudrate=BAUD_RATE, tx=tx_pin, rx=rx_pin,
