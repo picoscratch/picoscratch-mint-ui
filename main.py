@@ -1,5 +1,6 @@
+from display import drawLogo, oled, display_width, display_height, picoscratch_logo
+drawLogo(picoscratch_logo, ["PicoScratch", "Loading..."])
 from machine import Pin, I2C, ADC, PWM
-from ssd1306 import SSD1306_I2C
 import framebuf,sys
 import time
 from psds1820 import get_temp
@@ -7,6 +8,14 @@ import dftds # TDS/ppm library
 import network
 import _thread
 from mh_z19 import MH_Z19
+import config
+import uota
+import machine
+import json
+import select
+import os
+import psscd4x
+from panels import drawPanels, handlePanelButtons
 
 #
 # Pins
@@ -25,11 +34,13 @@ ledYellow.off()
 ledGreen.off()
 
 #
+# Sensor I2C Bus
+#
+i2c = I2C(0, sda=Pin(8), scl=Pin(9))
+
+#
 # Constants
 #
-display_width = 128 # SSD1306 width
-display_height = 64   # SSD1306 height
-picoscratch_logo = bytearray(b'BM>\x02\x00\x00\x00\x00\x00\x00>\x00\x00\x00(\x00\x00\x00@\x00\x00\x00@\x00\x00\x00\x01\x00\x01\x00\x00\x00\x00\x00\x00\x02\x00\x00\xc4\x0e\x00\x00\xc4\x0e\x00\x00\x02\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x03\xff\xfc\x00\x00\x00\x00\x00\x0f\xff\xff\x80\x00\x00\x00\x00\x1f\xff\xff\xe0\x00\x00\x00\x00?\x00\x0f\xf0\x00\x00\x00\x00|\x00\x01\xf8\x00\x00\x00\x00x\x00\x00|\x00\x00\x00\x00\xf0\x00\x00>\x00\x00\x00\x00\xe0\x00\x00\x1e\x00\x00\x00\x00\xe0\xff\xf8\x0e\x00\x00\x00\x00\xe0\x0c\x0e\x0f\x00\x00\x00\x00\xe0\x0c\x03\x0f\x00\x00\x00\x00\xf0\x0c\x03\x07\x00\x00\x00\x00x\x04\x01\x07\x00\x00\x00\x00|\x04\x01\x07\x00\x00\x00\x00?\x04\x02\x0f\x00\x00\x00\x00\x1f\x04\x06\x0f\x00\x00\x00\x00\x0f\x04x\x1e\x00\x00\x00\x00\x07\x07\x80\x1e\x00\x00\x00\x00\x07\x04\x00<\x00\x00\x00\x00\x07\x04\x00|\x00\x00\x00\x00\x07\x04\x01\xf8\x00\x00\x00\x00\x07\x04\x0f\xf0\x00\x00\x00\x00\x0f\x04\x1f\xe0\x00\x00\x00\x00\x1f\x04\x1f\xc0\x00\x00\x00\x00?\x04\x03\xe0\x00\x00\x00\x00|\x04\x01\xe0\x00\x00\x00\x00x\x04\x00\xe0\x00\x00\x00\x00p\x04\x00\xe0\x00\x00\x00\x00\xf0\x07\xf0\xe0\x00\x00\x00\x00\xf0\xff\xe0\xe0\x00\x00\x00\x00\xf0\x00\x00\xe0\x00\x00\x00\x00\xf0\x00\x01\xe0\x00\x00\x00\x00x\x00\x03\xe0\x00\x00\x00\x00x\x00\x07\xc0\x00\x00\x00\x00>\x07\xff\xc0\x00\x00\x00\x00\x1f\xff\xff\x80\x00\x00\x00\x00\x0f\xff\xfe\x00\x00\x00\x00\x00\x03\xff\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
 lineskip = 15
 btnSleep = 0.3
 
@@ -38,7 +49,7 @@ maxItems = 4
 # Menus
 menus = {
 	"main": { # type: ignore
-		"items": ["Temperatur", "Wasserqualitaet", "Panels", "Einstellungen", "Version", "Netzwerkausgang", "USB-Ausgang"], # type: ignore
+		"items": ["Panels", "Einstellungen", "Test", "Skripte", "Version", "Netzwerkausgang", "USB-Ausgang"], # type: ignore
 		"focus": 0 # type: ignore
 	},
 	"save": { # type: ignore
@@ -56,6 +67,10 @@ menus = {
 	"aps": { # type: ignore
 		"items": [], # type: ignore
 		"focus": 0 # type: ignore
+	},
+	"scripts": {
+		"items": [], # type: ignore
+		"focus": 0 # type: ignore
 	}
 }
 currentMenu = "main"
@@ -64,26 +79,14 @@ isInMenu = False
 # mainMenuFocus = 0
 
 #
-# Display
-#
-# 0x3C i2c address usually, can also rarely be 0x3D
-screen_i2c = I2C(1,scl=Pin(27),sda=Pin(26))  # start I2C on I2C1 (GPIO 26/27)
-# i2c_addr = [hex(ii) for ii in screen_i2c.scan()] # get I2C address in hex format
-# if i2c_addr==[]:
-# 	print('No I2C Display Found') 
-# 	sys.exit() # exit routine if no dev found
-# else:
-# 	print("I2C Address      : {}".format(i2c_addr[0])) # I2C device address
-# 	print("I2C Configuration: {}".format(screen_i2c)) # print I2C params
-
-oled = SSD1306_I2C(display_width, display_height, screen_i2c) # oled controller
-
-#
 # Networking
 #
 network.country("DE")
 network.hostname("picoscratchmint")
 nic = network.WLAN(network.STA_IF)
+version = "-1"
+with open('version', 'r') as f:
+	version = f.read().strip()
 
 #
 # Functions
@@ -131,16 +134,29 @@ sensors = {
 		"warn": 200, # type: ignore
 		"bad": 400 # type: ignore
 	}, # type: ignore
+	#"co2": { # type: ignore
+	#	"read": read_co2, # type: ignore
+	#	"unit": "ppm", # type: ignore
+	#	"min": 300, # type: ignore ######################## TODO: change these values to sth better
+	#	"max": 2200, # type: ignore
+	#	"friendlyName": "CO2", # type: ignore
+	#	"toolow": 0, # type: ignore
+	#	"good": 400, # type: ignore
+	#	"warn": 1300, # type: ignore
+	#	"bad": 1700 # type: ignore
+	#},
 	"co2": { # type: ignore
-		"read": read_co2, # type: ignore
+		"isI2C": True, # type: ignore
+		"addr": psscd4x.I2C_ADDR, # type: ignore
+		"read": psscd4x.read_i2c_co2, # type: ignore
+		"init": psscd4x.driver_init, # type: ignore
 		"unit": "ppm", # type: ignore
-		"min": 300, # type: ignore ######################## TODO: change these values to sth better
-		"max": 2200, # type: ignore
+		"min": 100, # type: ignore
+		"max": 2000, # type: ignore
 		"friendlyName": "CO2", # type: ignore
-		"toolow": 0, # type: ignore
-		"good": 400, # type: ignore
-		"warn": 1300, # type: ignore
-		"bad": 1700 # type: ignore
+		"toolow": -1, # type: ignore
+		"good": 800, # type: ignore
+		"bad": 1200 # type: ignore
 	}
 }
 
@@ -169,20 +185,6 @@ def trafficLight(value, goodlvl, warnlvl, badlvl, toolowlvl=0):
 		ledYellow.off()
 		ledGreen.off()
 
-def drawLogo(logo):
-	fb = framebuf.FrameBuffer(logo, 64, 64, framebuf.MONO_HLSB)
-
-	oled.fill(0)
-	oled.blit(fb, 0, -10)
-
-	start_x = 40
-	start_y = 12
-	txt_array = ["PicoScratch", "MINT", "Koffer"]
-	for iter_ii,txt in enumerate(txt_array):
-		oled.text(txt, start_x, start_y+(iter_ii*lineskip))
-	
-	oled.show()
-
 def askQuestion(men):
 	switchMenu(men)
 	time.sleep(btnSleep)
@@ -208,79 +210,84 @@ def gauge(v, maxv, x, y, w, h, minv=0):
 	oled.rect(x, y, w, h, 1)
 	oled.rect(x, y, int(a), h, 1, True)  # type: ignore
 
+def get_serial():
+	uid = machine.unique_id()
+	serial_number = ''.join(['{:02X}'.format(byte) for byte in uid])
+	return serial_number
+
 def startMenuItem(item):
 	if item == 4: # Version
 		oled.fill(0)
 		oled.text("PicoScratch", 0, 0)
-		oled.text("MINT Koffer", 0, 15)
-		oled.text("UI Version 0.1", 0, 30)
-		oled.text("HW Version PROTO", 0, 45)
+		oled.text(get_serial(), 0, 15)
+		oled.text("UI Version " + version, 0, 30)
+		oled.text("HW Version rev1", 0, 45)
 		oled.show()
 		while True:
 			if btnOK.value():
 				break
-	elif item == 0: # Temp
-		data = ["Zeit,Temperatur"]
-		count = 0
+	#elif item == 0: # Temp
+	#	data = ["Zeit,Temperatur"]
+	#	count = 0
+	#	while True:
+	#		if btnOK.value():
+	#			time.sleep(0.3)
+	#			break
+	#		oled.fill(0)
+	#		oled.text("Temperatursensor", 0, 0)
+	#		temp = get_temp()
+	#		count += 1
+	#		if count % 3 == 0: # with 0.3s sleep, this is every second
+	#			currentTime = time.localtime() # touple: (year, month, day, hour, minute, second, weekday, yearday)
+	#			data.append(str(currentTime[3]) + ":" + str(currentTime[4]) + str(currentTime[5]) + "," + str(temp))
+	#		if temp:
+	#			oled.text(str(temp) + "*C", 0, 15)
+	#			gauge(temp, 40, 0, 30, 100, 30, -10)
+	#			trafficLight(temp, sensors["temp"]["good"], sensors["temp"]["warn"], sensors["temp"]["bad"], sensors["temp"]["toolow"])
+	#		else:
+	#			oled.text("Nicht verbunden", 0, 30)
+	#		oled.show()
+	#		time.sleep(0.3)
+	#	shouldSave = askQuestion("save")
+	#	if shouldSave == 0:
+	#		oled.fill(0)
+	#		oled.text("Speichern...", 0, 0)
+	#		oled.show()
+	#		currentTime = time.localtime() # touple: (year, month, day, hour, minute, second, weekday, yearday)
+	#		filename = "t-" + str(currentTime[0]) + "-" + str(currentTime[1]) + "-" + str(currentTime[2]) + "-" + str(currentTime[3]) + "-" + str(currentTime[4]) + str(currentTime[5]) + ".csv"
+	#		with open(filename, "w") as f:
+	#			for line in data:
+	#				f.write(line + "\n")
+	#			f.close()
+	#		oled.fill(0)
+	#		oled.text("Gespeichert unter", 0, 0)
+	#		oled.text(filename, 0, 15)
+	#		oled.show()
+	#		time.sleep(2)
+	#	else:
+	#		oled.fill(0)
+	#		oled.text("Verworfen", 0, 0)
+	#		oled.show()
+	#		time.sleep(2)
+	#elif item == 1: # PPM
+	#	while True:
+	#		if btnOK.value():
+	#			break
+	#		oled.fill(0)
+	#		oled.text("PPM Messung", 0, 0)
+	#		tds_value = get_tds()
+	#		if tds_value:
+	#			oled.text(str(tds_value) + "ppm", 0, 15)
+	#			gauge(tds_value, 500, 0, 30, 100, 30)
+	#			trafficLight(tds_value, sensors["ppm"]["good"], sensors["ppm"]["warn"], sensors["ppm"]["bad"], sensors["ppm"]["toolow"])
+	#		else:
+	#			oled.text("Nicht verbunden", 0, 30)
+	#		oled.show()
+	#		time.sleep(0.3)
+	elif item == 0: # panels
 		while True:
-			if btnOK.value():
-				time.sleep(0.3)
-				break
-			oled.fill(0)
-			oled.text("Temperatursensor", 0, 0)
-			temp = get_temp()
-			count += 1
-			if count % 3 == 0: # with 0.3s sleep, this is every second
-				currentTime = time.localtime() # touple: (year, month, day, hour, minute, second, weekday, yearday)
-				data.append(str(currentTime[3]) + ":" + str(currentTime[4]) + str(currentTime[5]) + "," + str(temp))
-			if temp:
-				oled.text(str(temp) + "*C", 0, 15)
-				gauge(temp, 40, 0, 30, 100, 30, -10)
-				trafficLight(temp, sensors["temp"]["good"], sensors["temp"]["warn"], sensors["temp"]["bad"], sensors["temp"]["toolow"])
-			else:
-				oled.text("Nicht verbunden", 0, 30)
-			oled.show()
-			time.sleep(0.3)
-		shouldSave = askQuestion("save")
-		if shouldSave == 0:
-			oled.fill(0)
-			oled.text("Speichern...", 0, 0)
-			oled.show()
-			currentTime = time.localtime() # touple: (year, month, day, hour, minute, second, weekday, yearday)
-			filename = "t-" + str(currentTime[0]) + "-" + str(currentTime[1]) + "-" + str(currentTime[2]) + "-" + str(currentTime[3]) + "-" + str(currentTime[4]) + str(currentTime[5]) + ".csv"
-			with open(filename, "w") as f:
-				for line in data:
-					f.write(line + "\n")
-				f.close()
-			oled.fill(0)
-			oled.text("Gespeichert unter", 0, 0)
-			oled.text(filename, 0, 15)
-			oled.show()
-			time.sleep(2)
-		else:
-			oled.fill(0)
-			oled.text("Verworfen", 0, 0)
-			oled.show()
-			time.sleep(2)
-	elif item == 1: # PPM
-		while True:
-			if btnOK.value():
-				break
-			oled.fill(0)
-			oled.text("PPM Messung", 0, 0)
-			tds_value = get_tds()
-			if tds_value:
-				oled.text(str(tds_value) + "ppm", 0, 15)
-				gauge(tds_value, 500, 0, 30, 100, 30)
-				trafficLight(tds_value, sensors["ppm"]["good"], sensors["ppm"]["warn"], sensors["ppm"]["bad"], sensors["ppm"]["toolow"])
-			else:
-				oled.text("Nicht verbunden", 0, 30)
-			oled.show()
-			time.sleep(0.3)
-	elif item == 2: # panels
-		while True:
-			drawPanels()
-			if not handlePanelButtons():
+			drawPanels(oled, sensors, i2c, ledRed, ledYellow, ledGreen, display_width, display_height)
+			if not handlePanelButtons(btnLeft, btnOK, btnRight):
 				break
 	# elif item == 3: # settings
 		# pass
@@ -309,61 +316,72 @@ def startMenuItem(item):
 			# oled.show()
 			# time.sleep(2)
 	elif item == 5: # networking
-		# oled.fill(0)
-		# oled.text("Scanning...", 0, 0)
-		# oled.show()
-		# nic.active(True)
-		# aps = nic.scan()
-		# print(len(aps))
-		# menus["aps"]["items"] = []
-		# menus["aps"]["focus"] = 0
-		# for ap in aps:
-		# 	menus["aps"]["items"].append(ap[0].decode("utf-8") + " " + str(ap[3]) + "dBm")
-		# ap = askQuestion("aps")
-		# ap = menus["aps"]["items"][ap]
-		# ap = ap.split(" ")
-		# ap.pop()
-		# ap = " ".join(ap)
-		# oled.fill(0)
-		# oled.text("Connecting...", 0, 0)
-		# oled.show()
-		# nic.connect(ap, "88888888")
-		# import config
-		# oled.fill(0)
-		# oled.text("Connecting...", 0, 0)
-		# oled.show()
-		# nic.active(True)
-		# time.sleep(1)
-		# print(config.ssid, config.password)
-		# nic.connect(ssid=config.ssid, key=config.password)
-		# while nic.status() == network.STAT_CONNECTING:
-		# 	pass
-		# oled.fill(0)
-		# if nic.status() == network.STAT_GOT_IP:
-		# 	ip = nic.ifconfig()[0]
-		# 	oled.text("Connected", 0, 0)
-		# 	oled.text(ip, 0, 15)
-		# elif nic.status() == network.STAT_WRONG_PASSWORD:
-		# 	oled.text("Wrong password", 0, 0)
-		# elif nic.status() == network.STAT_NO_AP_FOUND:
-		# 	oled.text("No AP found", 0, 0)
-		# elif nic.status() == network.STAT_CONNECT_FAIL:
-		# 	oled.text("Connection failed", 0, 0)
-		# print(nic.status())
-		# oled.show()
-		# time.sleep(3)
-		networkOutput()
+		ledGreen.on()
+		oled.fill(0)
+		oled.text("Scanning...", 0, 0)
+		oled.show()
+		nic.active(True)
+		aps = nic.scan()
+		found = None
+		for ap in aps:
+			print(ap[0])
+			for net in config.networks:
+				if net["ssid"] == ap[0].decode("utf-8"):
+					found = net
+					break
+			if found:
+				break
+		ledGreen.off()
+		if found == None:
+			ledRed.on()
+			oled.fill(0)
+			oled.text("No AP found", 0, 0)
+			oled.show()
+			nic.active(False)
+			time.sleep(1)
+			ledRed.off()
+			return
+		oled.fill(0)
+		oled.text("Connecting...", 0, 0)
+		oled.show()
+		nic.connect(found["ssid"], found["password"])
+		while not nic.isconnected():
+			ledYellow.on()
+			time.sleep(0.5)
+			ledYellow.off()
+			time.sleep(0.5)
+		oled.fill(0)
+		oled.text("Checking for", 0, 0)
+		oled.text("updates...", 0, 10)
+		oled.show()
+		checkForUpdates()
 	elif item == 6: # enable serial
 		# _thread.start_new_thread(serialThread, ())
 		# remove the menu item
 		# menus["main"]["items"].pop(6)
 		# menus["main"]["focus"] = 0
 		serialThread()
+	elif item == 2: # test
+		import test
+	elif item == 3: # scripts
+		files = os.listdir("/user")
+		menus["scripts"]["items"] = []
+		menus["scripts"]["focus"] = 0
+		for file in files:
+			if not file.endswith(".py"):
+				continue
+			menus["scripts"]["items"].append(file.replace(".py", ""))
+		script = askQuestion("scripts")
+		print("Running script from /user/" + menus["scripts"]["items"][script] + ".py")
+		exec(open("/user/" + menus["scripts"]["items"][script] + ".py").read())
 	else: # Not implemented
 		oled.fill(0)
 		oled.text("Not Implemented", 0, 0)
 		oled.show()
 		time.sleep(3)
+	ledRed.duty_u16(0)
+	ledGreen.off()
+	ledYellow.off()
 	oled.fill(0)
 	oled.show()
 	time.sleep(1.5)
@@ -378,89 +396,18 @@ def switchMenu(to):
 	calculateShift()
 	drawMenu()
 
-def invertArea(x, y, w, h):
-	for i in range(w):
-		for j in range(h):
-			oled.pixel(x+i, y+j, not oled.pixel(x+i, y+j))
-
-panels = ["temp", "co2", "add"]
-selectedPanel = 0
-panelheight = 30
-
-def drawPanels():
-	oled.fill(0)
-	for i, panel in enumerate(panels):
-		h = i*panelheight + 2
-		# if i > 0:
-		# 	h = h + 3
-		# scroll the height away depending on the selected panel
-		h = h - (selectedPanel * panelheight)
-		if selectedPanel % 2 != 0:
-			h = h + panelheight
-		
-		oled.rect(0, h, display_width, panelheight, 1)
-
-		if panel == "add":
-			oled.text("Neuer Sensor...", 5, 5+h, 1)
-		else:
-			value = 0
-			unit = ""
-			min = 0
-			max = 0
-			friendlyName = panel
-			if panel in sensors:
-				value = sensors[panel]["read"]()
-				unit = sensors[panel]["unit"]
-				min = sensors[panel]["min"]
-				max = sensors[panel]["max"]
-				friendlyName = sensors[panel]["friendlyName"] if "friendlyName" in sensors[panel] else panel
-				if i == selectedPanel:
-					if value == None:
-						ledRed.duty_u16(0)
-						ledYellow.off()
-						ledGreen.off()
-					else:
-						trafficLight(value, sensors[panel]["good"], sensors[panel]["warn"], sensors[panel]["bad"], sensors[panel]["toolow"])
-			
-			oled.text(friendlyName, 5, 5+h, 1)
-
-			if value == None:
-				oled.text("Nicht verbunden", 5, 5+h+10, 1)
-			else:
-				text = str(value) + unit
-				# right aligned, every char is 8px wide
-				oled.text(text, display_width - (len(text) * 8) - 5, 5+h, 1)
-
-				gauge(value, max, 5, 5+h+10, display_width - 10, 10, min)
-		if i == selectedPanel:
-			invertArea(0, h, display_width, panelheight)
-	oled.show()
-
-def handlePanelButtons():
-	global selectedPanel
-	if btnLeft.value():
-		selectedPanel = selectedPanel - 1
-		if selectedPanel < 0:
-			selectedPanel = len(panels) - 1
-		drawPanels()
-		time.sleep(btnSleep)
-	elif btnRight.value():
-		selectedPanel = selectedPanel + 1
-		if selectedPanel > len(panels) - 1:
-			selectedPanel = 0
-		drawPanels()
-		time.sleep(btnSleep)
-	elif btnOK.value():
-		if panels[selectedPanel] == "add":
-			sensor = menus["sensors"]["items"][askQuestion("sensors")]
-			if sensor == "exit":
-				return False
-			panels.insert(len(panels) - 1, sensor)
-		else:
-			panels.pop(selectedPanel)
-		drawPanels()
-		time.sleep(btnSleep)
-	return True
+def checkForUpdates():
+	ledRed.duty_u16(int(65535/2))
+	if uota.check_for_updates(quiet=False):
+		oled.fill(0)
+		oled.text("Updating", 0, 0)
+		oled.text("firmware...", 0, 10)
+		oled.text("DO NOT POWER OFF", 0, 20)
+		oled.show()
+		uota.install_new_firmware()
+		ledRed.duty_u16(0)
+		machine.reset()
+	ledRed.duty_u16(0)
 
 #
 # Serial Thread
@@ -475,36 +422,90 @@ def serialThread():
 	time.sleep(1)
 	# this threads job is printing json data to the serial port, all sensors are polled here
 	while True:
-		try:
-			temp = get_temp()
-			last_temp = temp
-		except:
-			temp = last_temp
-		try:
-			tds_value = get_tds()
-			last_ppm = tds_value
-		except:
-			tds_value = last_ppm
-		print("{\"temp\":" + str(temp) + ",\"ppm\":" + str(tds_value) + "}")
+		#try:
+		#	temp = get_temp()
+		#	last_temp = temp
+		#except:
+		#	temp = last_temp
+		#try:
+		#	tds_value = get_tds()
+		#	last_ppm = tds_value
+		#except:
+		#	tds_value = last_ppm
+		#print("{\"temp\":" + str(temp) + ",\"ppm\":" + str(tds_value) + "}")
+		#print(json.dumps({"type": "sensor", "temp": temp, "ppm": tds_value}))
+		packet = {"type": "sensor"}
+		for sensorName in sensors:
+			try:
+				packet[sensorName] = sensors[sensorName]["read"]()
+			except:
+				packet[sensorName] = None
+		print(json.dumps(packet))
+		
+		##
+		## INPUT
+		##
+		
+		read, _, _ = select.select([sys.stdin], [], [], 0)
+		if sys.stdin in read:
+			inputdata = sys.stdin.readline().strip()
+			if inputdata:
+				try:
+					data = json.loads(inputdata)
+					if data["type"] == "list_files":
+						#print("{\"type\": \"no\"}")
+						send = {"type": "list_files", "files": []}
+						for (filename, isdir, size, mtime, sha256) in listdir(data["path"]):
+							send["files"].append({"filename": filename, "isDir": isdir, "size": size})
+						print(json.dumps(send))
+					elif data["type"] == "scan_networks":
+						nic.active(True)
+						send = {"type": "scan_networks", "networks": [], "current": { "ssid": nic.config("ssid") }}
+						nets = nic.scan()
+						for net in nets:
+							send["networks"].append({"ssid": net[0], "rssi": net[3], "security": net[4]})
+						print(json.dumps(send))
+				except Exception as e:
+					print(json.dumps({"type": "error", "error": e}))
 		if btnOK.value():
 			break
 		time.sleep(1)
 
+def get_file_stats(filename):
+	stat = os.stat(filename)
+	size = stat[6]
+	mtime = stat[8]
+	return (size, mtime, '')
+
+def listdir(directory):
+	files = os.ilistdir(directory)
+	out = []
+	for (filename, filetype, inode, _) in files:
+		fn_full = "/" + filename if directory == '/' else directory + '/' + filename
+		isdir = filetype == 0x4000
+		if isdir:
+			out.append((fn_full, isdir, 0, 0, ''))
+		else:
+			file_stats = get_file_stats(fn_full)
+			out.append((fn_full, isdir) + file_stats)
+	return sorted(out)
+
 def networkOutput():
 	pass
 
+#serialThread()
 # _thread.start_new_thread(serialThread, ())
 
 #
 # Main
 #
-drawLogo(picoscratch_logo)
+# drawLogo(picoscratch_logo, ["PicoScratch", "Press OK"])
 
 # Wait for OK button
-while True:
-	v = btnOK.value()
-	if v:
-		break
+# while True:
+# 	v = btnOK.value()
+# 	if v:
+# 		break
 
 drawMenu()
 

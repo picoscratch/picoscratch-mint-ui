@@ -7,27 +7,23 @@ MIT license; Copyright (c) 2021 Martin Komon
 import gc
 import uos
 import urequests
-import uzlib
-import utarfile as tarfile
+import zlib as uzlib
+import tarfile
 from micropython import const
 
-try:
-    import logging
-    log = logging.getLogger(__name__)
-except ImportError:
-    class logging:
-        def critical(self, entry):
-            print('CRITICAL: ' + entry)
-        def error(self, entry):
-            print('ERROR: ' + entry)
-        def warning(self, entry):
-            print('WARNING: ' + entry)
-        def info(self, entry):
-            print('INFO: ' + entry)
-        def debug(self, entry):
-            print('DEBUG: ' + entry)
-    log = logging()
-            
+class logging:
+    def critical(self, entry):
+        print('CRITICAL: ' + entry)
+    def error(self, entry):
+        print('ERROR: ' + entry)
+    def warning(self, entry):
+        print('WARNING: ' + entry)
+    def info(self, entry):
+        print('INFO: ' + entry)
+    def debug(self, entry):
+        print('DEBUG: ' + entry)
+log = logging()
+
 try:
     from ucertpin import get_pubkey_hash_from_der
     ucertpin_available = True
@@ -44,7 +40,7 @@ def load_ota_cfg():
         with open('uota.cfg', 'r') as f:
             ota_config.update(eval(f.read()))
         return True
-    except OSError:
+    except OSError as e:
         log.error('Cannot find uota config file `uota.cfg`. OTA is disabled.')
         return False
 
@@ -99,17 +95,16 @@ def check_for_updates(version_check=True, quiet=False, pubkey_hash=b'') -> bool:
 
     if not load_ota_cfg():
         return False
+    
+    print(ota_config["url"])
 
     if not ota_config['url'].endswith('/'):
         ota_config['url'] = ota_config['url'] + '/'
+    
 
     response = urequests.get(ota_config['url'] + 'latest')
-
-    if ucertpin_available and pubkey_hash:
-        server_pubkey_hash = get_pubkey_hash_from_der(response.raw.getpeercert(True))
-        if server_pubkey_hash != pubkey_hash:
-            log.warning('Certificate pinning failed, the hash of server public key does not match. Aborting the update.')
-            return False
+    
+    print(response.text)
 
     remote_version, remote_filename, *optional = response.text.strip().rstrip(';').split(';')
     min_free_space, *remote_hash = optional if optional else (0, '')
@@ -168,37 +163,35 @@ def install_new_firmware(quiet=False):
         log.info('No new firmware file found in flash.')
         return
 
-    with open(ota_config['tmp_filename'], 'rb') as f1:
-        f2 = uzlib.DecompIO(f1, GZDICT_SZ)
-        f3 = tarfile.TarFile(fileobj=f2)
-        for _file in f3:
-            file_name = _file.name
-            if file_name in ota_config['excluded_files']:
-                item_type = 'directory' if file_name.endswith('/') else 'file'
-                not quiet and log.info(f'Skipping excluded {item_type} {file_name}')
-                continue
+    t = tarfile.TarFile(ota_config['tmp_filename'])
+    for _file in t:
+        file_name = _file.name
+        if file_name in ota_config['excluded_files']:
+            item_type = 'directory' if file_name.endswith('/') else 'file'
+            not quiet and log.info(f'Skipping excluded {item_type} {file_name}')
+            continue
 
-            if file_name.endswith('/'):  # is a directory
-                try:
-                    not quiet and log.debug(f'creating directory {file_name} ... ')
-                    uos.mkdir(file_name[:-1])  # without trailing slash or fail with errno 2
-                    not quiet and log.debug('ok')
-                except OSError as e:
-                    if e.errno == 17:
-                        not quiet and log.debug('already exists')
-                    else:
-                        raise e
-                continue
-            file_obj = f3.extractfile(_file)
-            with open(file_name, 'wb') as f_out:
-                written_bytes = 0
-                while True:
-                    buf = file_obj.read(512)
-                    if not buf:
-                        break
-                    written_bytes += f_out.write(buf)
-                not quiet and log.info(f'file {file_name} ({written_bytes} B) written to flash')
-
+        if file_name.endswith('/'):  # is a directory
+            try:
+                not quiet and log.debug(f'creating directory {file_name} ... ')
+                uos.mkdir(file_name[:-1])  # without trailing slash or fail with errno 2
+                not quiet and log.debug('ok')
+            except OSError as e:
+                if e.errno == 17:
+                    not quiet and log.debug('already exists')
+                else:
+                    raise e
+            continue
+        file_obj = t.extractfile(_file)
+        with open(file_name, 'wb') as f_out:
+            written_bytes = 0
+            while True:
+                buf = file_obj.read(512)
+                if not buf:
+                    break
+                written_bytes += f_out.write(buf)
+            not quiet and log.info(f'file {file_name} ({written_bytes} B) written to flash')
+    
     uos.remove(ota_config['tmp_filename'])
     if load_ota_cfg():
         for filename in ota_config['delete']:

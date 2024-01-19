@@ -15,6 +15,6 @@ while True:
     tds_sensor.update()
     if not tds_sensor.calibrated:
         print("Calibrating")
-        tds_sensor.calibrate(100)
+        tds_sensor.calibrate(69)
     print(tds_sensor.tds_value)
     time.sleep(2)

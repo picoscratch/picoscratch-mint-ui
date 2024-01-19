@@ -10,5 +10,8 @@
     "python.analysis.extraPaths": [
         ".vscode/Pico-W-Stub/stubs",
         "./lib"
-    ]
+    ],
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportGeneralTypeIssues": "none"
+    }
 }
