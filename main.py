@@ -14,8 +14,8 @@ import machine
 import json
 import select
 import os
-import psscd4x
 from panels import drawPanels, handlePanelButtons
+from sensor import sensors
 
 #
 # Pins
@@ -91,81 +91,6 @@ with open('version', 'r') as f:
 #
 # Functions
 #
-def get_tds():
-	try:
-		tds_sensor = dftds.GravityTDS(28, adc_range=65535, k_value_repository=dftds.KValueRepositoryFlash("tds_calibration.json"))
-		tds_sensor.begin()
-		temp = get_temp()
-		if temp == None:
-			# tds_sensor.temperature = 25
-			return None
-		# else:
-		tds_sensor.temperature = temp
-		# tds_sensor.temperature = get_temp() # type: ignore
-		tds_value = tds_sensor.update()
-		return float('{0:.2g}'.format(tds_value))
-	except:
-		return None
-
-def read_co2():
-	sensor = MH_Z19(Pin(8), Pin(9), 1)
-	return sensor.read_co2()
-
-sensors = {
-	"temp": { # type: ignore
-		"read": get_temp, # type: ignore
-		"unit": "*C", # type: ignore
-		"min": -10, # type: ignore
-		"max": 40, # type: ignore
-		"friendlyName": "Temp.", # type: ignore
-		"toolow": 10, # type: ignore
-		"good": 20, # type: ignore
-		"warn": 30, # type: ignore
-		"bad": 40 # type: ignore
-	},
-	"ppm": { # type: ignore
-		"read": get_tds, # type: ignore
-		"unit": "ppm", # type: ignore
-		"min": 0, # type: ignore
-		"max": 500, # type: ignore
-		"friendlyName": "ppm", # type: ignore
-		"toolow": 70, # type: ignore
-		"good": 80, # type: ignore
-		"warn": 200, # type: ignore
-		"bad": 400 # type: ignore
-	}, # type: ignore
-	#"co2": { # type: ignore
-	#	"read": read_co2, # type: ignore
-	#	"unit": "ppm", # type: ignore
-	#	"min": 300, # type: ignore ######################## TODO: change these values to sth better
-	#	"max": 2200, # type: ignore
-	#	"friendlyName": "CO2", # type: ignore
-	#	"toolow": 0, # type: ignore
-	#	"good": 400, # type: ignore
-	#	"warn": 1300, # type: ignore
-	#	"bad": 1700 # type: ignore
-	#},
-	"co2": { # type: ignore
-		"isI2C": True, # type: ignore
-		"addr": psscd4x.I2C_ADDR, # type: ignore
-		"read": psscd4x.read_i2c_co2, # type: ignore
-		"init": psscd4x.driver_init, # type: ignore
-		"unit": "ppm", # type: ignore
-		"min": 100, # type: ignore
-		"max": 2000, # type: ignore
-		"friendlyName": "CO2", # type: ignore
-		"toolow": -1, # type: ignore
-		"good": 800, # type: ignore
-		"bad": 1200 # type: ignore
-	}
-}
-
-def max4466():
-	analog_value = ADC(28)
-	conversion_factor =3.3/(65536)
-	reading = analog_value.read_u16()*conversion_factor
-	return reading
-
 def trafficLight(value, goodlvl, warnlvl, badlvl, toolowlvl=0):
 	on = 65535
 	if value <= toolowlvl or value < goodlvl:
@@ -360,7 +285,8 @@ def startMenuItem(item):
 		# remove the menu item
 		# menus["main"]["items"].pop(6)
 		# menus["main"]["focus"] = 0
-		serialThread()
+		from packetjob import serialThread
+		serialThread(btnOK, nic)
 	elif item == 2: # test
 		import test
 	elif item == 3: # scripts
@@ -408,93 +334,6 @@ def checkForUpdates():
 		ledRed.duty_u16(0)
 		machine.reset()
 	ledRed.duty_u16(0)
-
-#
-# Serial Thread
-#
-def serialThread():
-	last_temp = -1
-	last_ppm = -1
-	oled.fill(0)
-	oled.text("Daten ueber USB", 0, 0, 1)
-	oled.text("OK zum beenden", 0, 10, 1)
-	oled.show()
-	time.sleep(1)
-	# this threads job is printing json data to the serial port, all sensors are polled here
-	while True:
-		#try:
-		#	temp = get_temp()
-		#	last_temp = temp
-		#except:
-		#	temp = last_temp
-		#try:
-		#	tds_value = get_tds()
-		#	last_ppm = tds_value
-		#except:
-		#	tds_value = last_ppm
-		#print("{\"temp\":" + str(temp) + ",\"ppm\":" + str(tds_value) + "}")
-		#print(json.dumps({"type": "sensor", "temp": temp, "ppm": tds_value}))
-		packet = {"type": "sensor"}
-		for sensorName in sensors:
-			try:
-				packet[sensorName] = sensors[sensorName]["read"]()
-			except:
-				packet[sensorName] = None
-		print(json.dumps(packet))
-		
-		##
-		## INPUT
-		##
-		
-		read, _, _ = select.select([sys.stdin], [], [], 0)
-		if sys.stdin in read:
-			inputdata = sys.stdin.readline().strip()
-			if inputdata:
-				try:
-					data = json.loads(inputdata)
-					if data["type"] == "list_files":
-						#print("{\"type\": \"no\"}")
-						send = {"type": "list_files", "files": []}
-						for (filename, isdir, size, mtime, sha256) in listdir(data["path"]):
-							send["files"].append({"filename": filename, "isDir": isdir, "size": size})
-						print(json.dumps(send))
-					elif data["type"] == "scan_networks":
-						nic.active(True)
-						send = {"type": "scan_networks", "networks": [], "current": { "ssid": nic.config("ssid") }}
-						nets = nic.scan()
-						for net in nets:
-							send["networks"].append({"ssid": net[0], "rssi": net[3], "security": net[4]})
-						print(json.dumps(send))
-				except Exception as e:
-					print(json.dumps({"type": "error", "error": e}))
-		if btnOK.value():
-			break
-		time.sleep(1)
-
-def get_file_stats(filename):
-	stat = os.stat(filename)
-	size = stat[6]
-	mtime = stat[8]
-	return (size, mtime, '')
-
-def listdir(directory):
-	files = os.ilistdir(directory)
-	out = []
-	for (filename, filetype, inode, _) in files:
-		fn_full = "/" + filename if directory == '/' else directory + '/' + filename
-		isdir = filetype == 0x4000
-		if isdir:
-			out.append((fn_full, isdir, 0, 0, ''))
-		else:
-			file_stats = get_file_stats(fn_full)
-			out.append((fn_full, isdir) + file_stats)
-	return sorted(out)
-
-def networkOutput():
-	pass
-
-#serialThread()
-# _thread.start_new_thread(serialThread, ())
 
 #
 # Main
