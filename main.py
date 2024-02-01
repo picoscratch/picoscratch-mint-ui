@@ -16,6 +16,7 @@ import select
 import os
 from panels import drawPanels, handlePanelButtons
 from sensor import sensors
+from util import get_serial
 
 #
 # Pins
@@ -134,11 +135,6 @@ def gauge(v, maxv, x, y, w, h, minv=0):
 	a = a * w
 	oled.rect(x, y, w, h, 1)
 	oled.rect(x, y, int(a), h, 1, True)  # type: ignore
-
-def get_serial():
-	uid = machine.unique_id()
-	serial_number = ''.join(['{:02X}'.format(byte) for byte in uid])
-	return serial_number
 
 def startMenuItem(item):
 	if item == 4: # Version
@@ -280,6 +276,8 @@ def startMenuItem(item):
 		oled.text("updates...", 0, 10)
 		oled.show()
 		checkForUpdates()
+		from packetjob import networkOutput
+		networkOutput(btnOK, nic)
 	elif item == 6: # enable serial
 		# _thread.start_new_thread(serialThread, ())
 		# remove the menu item
