@@ -57,6 +57,16 @@ def serialThread(btnOK, nic):
 						for net in nets:
 							send["networks"].append({"ssid": net[0], "rssi": net[3], "security": net[4]})
 						print(json.dumps(send))
+					elif data["type"] == "read_file":
+						print(json.dumps({"type": "read_file", "content": open(data["path"], "r").read()}))
+					elif data["type"] == "write_file":
+						f = open(data["path"], "w")
+						f.write(data["content"])
+						f.close()
+						print(json.dumps({"type": "write_file", "content": data["content"]}))
+					elif data["type"] == "delete_file":
+						os.remove(data["path"])
+						print(json.dumps({"type": "delete_file"}))
 				except Exception as e:
 					print(json.dumps({"type": "error", "error": e}))
 		if btnOK.value():
