@@ -1,6 +1,6 @@
 from machine import Pin, I2C
-from ssd1306 import SSD1306_I2C
-# from sh1106 import SH1106_I2C as SSD1306_I2C
+#from ssd1306 import SSD1306_I2C
+from sh1106 import SH1106_I2C as SSD1306_I2C
 import framebuf
 
 display_width = 128 # SSD1306 width

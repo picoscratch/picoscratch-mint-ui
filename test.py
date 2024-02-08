@@ -1,5 +1,6 @@
 from machine import Pin, I2C, ADC, PWM
-from ssd1306 import SSD1306_I2C
+# from ssd1306 import SSD1306_I2C
+from sh1106 import SH1106_I2C as SSD1306_I2C
 import framebuf,sys
 import time
 from psds1820 import get_temp
