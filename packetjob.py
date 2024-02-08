@@ -115,27 +115,27 @@ def networkOutput(btnOK, nic):
 		## INPUT
 		##
 		
-		read, _, _ = select.select([sock], [], [], 0)
-		if sock in read:
-			inputdata = sock.readline().strip()
-			if inputdata:
-				try:
-					data = json.loads(inputdata)
-					if data["type"] == "list_files":
-						#print("{\"type\": \"no\"}")
-						send = {"type": "list_files", "files": []}
-						for (filename, isdir, size, mtime, sha256) in listdir(data["path"]):
-							send["files"].append({"filename": filename, "isDir": isdir, "size": size})
-						sock.send(json.dumps(send))
-					elif data["type"] == "scan_networks":
-						nic.active(True)
-						send = {"type": "scan_networks", "networks": [], "current": { "ssid": nic.config("ssid") }}
-						nets = nic.scan()
-						for net in nets:
-							send["networks"].append({"ssid": net[0], "rssi": net[3], "security": net[4]})
-						sock.send(json.dumps(send))
-				except Exception as e:
-					sock.send(json.dumps({"type": "error", "error": e}))
+		# read, _, _ = select.select([sock], [], [], 0)
+		# if sock in read:
+		# 	inputdata = sock.readline().strip()
+		# 	if inputdata:
+		# 		try:
+		# 			data = json.loads(inputdata)
+		# 			if data["type"] == "list_files":
+		# 				#print("{\"type\": \"no\"}")
+		# 				send = {"type": "list_files", "files": []}
+		# 				for (filename, isdir, size, mtime, sha256) in listdir(data["path"]):
+		# 					send["files"].append({"filename": filename, "isDir": isdir, "size": size})
+		# 				sock.send(json.dumps(send))
+		# 			elif data["type"] == "scan_networks":
+		# 				nic.active(True)
+		# 				send = {"type": "scan_networks", "networks": [], "current": { "ssid": nic.config("ssid") }}
+		# 				nets = nic.scan()
+		# 				for net in nets:
+		# 					send["networks"].append({"ssid": net[0], "rssi": net[3], "security": net[4]})
+		# 				sock.send(json.dumps(send))
+		# 		except Exception as e:
+		# 			sock.send(json.dumps({"type": "error", "error": e}))
 		if btnOK.value():
 			break
 		sleep(1)

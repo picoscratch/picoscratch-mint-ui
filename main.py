@@ -281,7 +281,10 @@ def startMenuItem(item):
 		oled.show()
 		checkForUpdates()
 		from packetjob import networkOutput
-		networkOutput(btnOK, nic)
+		try:
+			networkOutput(btnOK, nic)
+		except Exception as e:
+			print(e)
 	elif item == 6: # enable serial
 		# _thread.start_new_thread(serialThread, ())
 		# remove the menu item
