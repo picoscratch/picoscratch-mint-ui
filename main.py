@@ -1,5 +1,5 @@
-from display import drawLogo, oled, display_width, display_height, picoscratch_logo
-drawLogo(picoscratch_logo, ["PicoScratch", "Loading..."])
+from display import drawLogo, oled, display_width, display_height, readPBM
+drawLogo(readPBM("logo.pbm"), ["PicoScratch", "Loading..."])
 from machine import Pin, I2C, ADC, PWM
 import framebuf,sys
 import time

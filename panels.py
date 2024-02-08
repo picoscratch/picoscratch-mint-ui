@@ -1,5 +1,6 @@
 import time
 from sensor import read_sensors
+from display import invertArea
 
 allPanels = ["temp", "ppm"]
 panels = []
@@ -7,11 +8,6 @@ selectedPanel = 0
 panelheight = 30
 lastI2Cids = []
 btnSleep = 0.3
-
-def invertArea(oled, x, y, w, h):
-	for i in range(w):
-		for j in range(h):
-			oled.pixel(x+i, y+j, not oled.pixel(x+i, y+j))
 
 def gauge(oled, v, maxv, x, y, w, h, minv=0):
 	a = (v - minv) / (maxv - minv)
