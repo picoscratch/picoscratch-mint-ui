@@ -1,4 +1,4 @@
-from display import oled
+from display import oled, readPBM
 from time import sleep
 import os
 import json
@@ -15,8 +15,9 @@ def mergeDicts(x, y):
 
 def serialThread(btnOK, nic):
 	oled.fill(0)
-	oled.text("Daten ueber USB", 0, 0, 1)
-	oled.text("OK zum beenden", 0, 10, 1)
+	# oled.text("Daten ueber USB", 0, 0, 1)
+	# oled.text("OK zum beenden", 0, 10, 1)
+	oled.blit(readPBM("usbmode.pbm"), 0, 0)
 	oled.show()
 	sleep(1)
 	serial = get_serial()
@@ -95,13 +96,14 @@ def listdir(directory):
 def networkOutput(btnOK, nic):
 	serial = get_serial()
 	oled.fill(0)
-	oled.text("Daten ueber NET", 0, 0, 1)
-	oled.text("OK zum beenden", 0, 10, 1)
+	# oled.text("Daten ueber NET", 0, 0, 1)
+	# oled.text("OK zum beenden", 0, 10, 1)
+	oled.blit(readPBM("netmode.pbm"), 0, 0)
 	oled.text(serial, 0, 20, 1)
 	oled.show()
 	sleep(1)
 	sock = socket.socket()
-	sock.connect(("10.10.11.186", 2737))
+	sock.connect(socket.getaddrinfo("mint.picoscratch.de", 2737)[0][-1])
 	while True:
 		sensors = read_sensors()
 		simplifiedSensors = {}

@@ -13,5 +13,19 @@
     ],
     "python.analysis.diagnosticSeverityOverrides": {
         "reportGeneralTypeIssues": "none"
-    }
+		},
+		"micropico.syncFileTypes": [
+			"py",
+			"txt",
+			"log",
+			"json",
+			"xml",
+			"html",
+			"js",
+			"css",
+			"mpy",
+			"pbm",
+			"cfg"
+		],
+		"micropico.softResetAfterUpload": true
 }

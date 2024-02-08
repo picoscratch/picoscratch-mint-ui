@@ -17,6 +17,7 @@ import os
 from panels import drawPanels, handlePanelButtons
 from sensor import sensors
 from util import get_serial
+import gc
 
 #
 # Pins
@@ -239,7 +240,8 @@ def startMenuItem(item):
 	elif item == 5: # networking
 		ledGreen.on()
 		oled.fill(0)
-		oled.text("Scanning...", 0, 0)
+		# oled.text("Scanning...", 0, 0)
+		oled.blit(readPBM("scanningnets.pbm"), 0, 0)
 		oled.show()
 		nic.active(True)
 		aps = nic.scan()
@@ -263,7 +265,8 @@ def startMenuItem(item):
 			ledRed.off()
 			return
 		oled.fill(0)
-		oled.text("Connecting...", 0, 0)
+		# oled.text("Connecting...", 0, 0)
+		oled.blit(readPBM("connectingnet.pbm"), 0, 0)
 		oled.show()
 		nic.connect(found["ssid"], found["password"])
 		while not nic.isconnected():
@@ -272,8 +275,9 @@ def startMenuItem(item):
 			ledYellow.off()
 			time.sleep(0.5)
 		oled.fill(0)
-		oled.text("Checking for", 0, 0)
-		oled.text("updates...", 0, 10)
+		# oled.text("Checking for", 0, 0)
+		# oled.text("updates...", 0, 10)
+		oled.blit(readPBM("searchingupdates.pbm"), 0, 0)
 		oled.show()
 		checkForUpdates()
 		from packetjob import networkOutput
@@ -308,6 +312,7 @@ def startMenuItem(item):
 	ledYellow.off()
 	oled.fill(0)
 	oled.show()
+	gc.collect()
 	time.sleep(1.5)
 
 def calculateShift():
