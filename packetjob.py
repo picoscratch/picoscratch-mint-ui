@@ -7,11 +7,39 @@ import sys
 from sensor import read_sensors
 from util import get_serial
 import socket
+import network
 
 def mergeDicts(x, y):
 	z = x.copy()   # start with keys and values of x
 	z.update(y)    # modifies z with keys and values of y
 	return z
+
+def handlePacket(data):
+	if data["type"] == "list_files":
+		#print("{\"type\": \"no\"}")
+		send = {"type": "list_files", "files": []}
+		for (filename, isdir, size, mtime, sha256) in listdir(data["path"]):
+			send["files"].append({"filename": filename, "isDir": isdir, "size": size})
+		return json.dumps(send)
+	elif data["type"] == "scan_networks":
+		nic = network.WLAN(network.STA_IF)
+		nic.active(True)
+		send = {"type": "scan_networks", "networks": [], "current": { "ssid": nic.config("ssid") }}
+		nets = nic.scan()
+		for net in nets:
+			send["networks"].append({"ssid": net[0], "rssi": net[3], "security": net[4]})
+		return json.dumps(send)
+	elif data["type"] == "read_file":
+		return json.dumps({"type": "read_file", "content": open(data["path"], "r").read()})
+	elif data["type"] == "write_file":
+		f = open(data["path"], "w")
+		f.write(data["content"])
+		f.close()
+		return json.dumps({"type": "write_file", "content": data["content"]})
+	elif data["type"] == "delete_file":
+		os.remove(data["path"])
+		return json.dumps({"type": "delete_file"})
+	return json.dumps({"type": "error", "error": "unknown type"})
 
 def serialThread(btnOK, nic):
 	oled.fill(0)
@@ -45,29 +73,7 @@ def serialThread(btnOK, nic):
 			if inputdata:
 				try:
 					data = json.loads(inputdata)
-					if data["type"] == "list_files":
-						#print("{\"type\": \"no\"}")
-						send = {"type": "list_files", "files": []}
-						for (filename, isdir, size, mtime, sha256) in listdir(data["path"]):
-							send["files"].append({"filename": filename, "isDir": isdir, "size": size})
-						print(json.dumps(send))
-					elif data["type"] == "scan_networks":
-						nic.active(True)
-						send = {"type": "scan_networks", "networks": [], "current": { "ssid": nic.config("ssid") }}
-						nets = nic.scan()
-						for net in nets:
-							send["networks"].append({"ssid": net[0], "rssi": net[3], "security": net[4]})
-						print(json.dumps(send))
-					elif data["type"] == "read_file":
-						print(json.dumps({"type": "read_file", "content": open(data["path"], "r").read()}))
-					elif data["type"] == "write_file":
-						f = open(data["path"], "w")
-						f.write(data["content"])
-						f.close()
-						print(json.dumps({"type": "write_file", "content": data["content"]}))
-					elif data["type"] == "delete_file":
-						os.remove(data["path"])
-						print(json.dumps({"type": "delete_file"}))
+					print(handlePacket(data))
 				except Exception as e:
 					print(json.dumps({"type": "error", "error": e}))
 		if btnOK.value():
@@ -94,6 +100,13 @@ def listdir(directory):
 	return sorted(out)
 
 def networkOutput(btnOK, nic):
+	oled.fill(0)
+	oled.blit(readPBM("connecting.pbm"), 0, 0)
+	oled.show()
+	sleep(1)
+	sock = socket.socket()
+	sock.connect(socket.getaddrinfo("mint.picoscratch.de", 2737)[0][-1])
+	sock.setblocking(0)
 	serial = get_serial()
 	oled.fill(0)
 	# oled.text("Daten ueber NET", 0, 0, 1)
@@ -101,9 +114,6 @@ def networkOutput(btnOK, nic):
 	oled.blit(readPBM("netmode.pbm"), 0, 0)
 	oled.text(serial, 0, 20, 1)
 	oled.show()
-	sleep(1)
-	sock = socket.socket()
-	sock.connect(socket.getaddrinfo("mint.picoscratch.de", 2737)[0][-1])
 	while True:
 		sensors = read_sensors()
 		simplifiedSensors = {}
@@ -114,6 +124,16 @@ def networkOutput(btnOK, nic):
 		##
 		## INPUT
 		##
+
+		sleep(0.5)
+
+		try:
+			data = sock.recv(1024)
+			print(data)
+			sock.send(handlePacket(json.loads(data)))
+		except Exception as e:
+			# print(e)
+			pass # no data to read
 		
 		# read, _, _ = select.select([sock], [], [], 0)
 		# if sock in read:
@@ -138,4 +158,4 @@ def networkOutput(btnOK, nic):
 		# 			sock.send(json.dumps({"type": "error", "error": e}))
 		if btnOK.value():
 			break
-		sleep(1)
+		sleep(0.5)
