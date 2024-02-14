@@ -8,19 +8,35 @@ i2c = I2C(0, sda=Pin(8), scl=Pin(9))
 
 def get_tds():
 	try:
+		if not Pin(10, Pin.IN).value():
+			return None
 		tds_sensor = dftds.GravityTDS(28, adc_range=65535, k_value_repository=dftds.KValueRepositoryFlash("tds_calibration.json"))
 		tds_sensor.begin()
 		temp = get_temp()
 		if temp == None:
-			# tds_sensor.temperature = 25
-			return None
-		# else:
-		tds_sensor.temperature = temp
+			tds_sensor.temperature = 25
+			#return None
+		else:
+			tds_sensor.temperature = temp
 		# tds_sensor.temperature = get_temp()
 		tds_value = tds_sensor.update()
 		return float('{0:.2g}'.format(tds_value))
 	except:
 		return None
+
+def read_ph():
+	m = 11.48
+	n = -11.1553
+	vcor = 1.38
+	# Create an ADC object linked to pin 36
+	adc = ADC(Pin(27, Pin.IN))
+	volt = adc.read_u16()
+	volt = volt * (3.3 / 65536) * vcor
+	ph = m*volt+n
+	if ph > 14:
+		return None
+	return float('{0:.2g}'.format(ph))
+
 
 def read_co2():
 	sensor = MH_Z19(Pin(8), Pin(9), 1)
@@ -72,6 +88,16 @@ sensors = {
 		"toolow": -1,
 		"good": 800,
 		"bad": 1200
+	},
+	"ph": {
+		"read": read_ph,
+		"unit": "pH",
+		"min": 0,
+		"max": 14,
+		"friendlyName": "pH",
+		"toolow": -1,
+		"good": 800,
+		"bad": 1200,
 	}
 }
 

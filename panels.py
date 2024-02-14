@@ -18,9 +18,10 @@ def gauge(oled, v, maxv, x, y, w, h, minv=0):
 def drawPanels(oled, sensors, i2c, ledRed, ledYellow, ledGreen, display_width, display_height):
 	# global panels
 	# global lastI2Cids
+	global panels
+	panels = []
 	oled.fill(0)
 	i = 0
-	panels = []
 	
 	# Legacy sensors
 	# for panel in allPanels:
@@ -196,6 +197,9 @@ def drawPanels(oled, sensors, i2c, ledRed, ledYellow, ledGreen, display_width, d
 	
 	# If no sensors are attached
 	if len(panels) == 0:
+		ledRed.duty_u16(0)
+		ledYellow.off()
+		ledGreen.off()
 		oled.fill(0)
 		h = int(display_height/2-(panelheight/2))
 		oled.rect(0, h, display_width, panelheight, 1)
@@ -203,7 +207,7 @@ def drawPanels(oled, sensors, i2c, ledRed, ledYellow, ledGreen, display_width, d
 		oled.text("Sensor", 5, 15+h)
 	oled.show()
 
-def handlePanelButtons(btnLeft, btnOK, btnRight):
+def handlePanelButtons(btnLeft, btnOK, btnRight, btnBack):
 	global selectedPanel
 	if btnLeft.value():
 		selectedPanel = selectedPanel - 1
@@ -217,7 +221,7 @@ def handlePanelButtons(btnLeft, btnOK, btnRight):
 			selectedPanel = 0
 		#drawPanels()
 		time.sleep(btnSleep)
-	elif btnOK.value():
+	elif btnBack.value():
 		#if panels[selectedPanel] == "add":
 		#	sensor = menus["sensors"]["items"][askQuestion("sensors")]
 		#	if sensor == "exit":
@@ -228,4 +232,6 @@ def handlePanelButtons(btnLeft, btnOK, btnRight):
 		#drawPanels()
 		#time.sleep(btnSleep)
 		return False
+	if selectedPanel > len(panels) - 1:
+		selectedPanel = len(panels) - 1
 	return True

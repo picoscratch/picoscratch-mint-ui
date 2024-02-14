@@ -1,4 +1,4 @@
-from display import drawLogo, oled, display_width, display_height, readPBM
+from display import drawLogo, oled, display_width, display_height, readPBM, brightness
 drawLogo(readPBM("logo.pbm"), ["PicoScratch", "Loading..."])
 from machine import Pin, I2C, ADC, PWM
 import framebuf,sys
@@ -16,7 +16,7 @@ import select
 import os
 from panels import drawPanels, handlePanelButtons
 from sensor import sensors
-from util import get_serial
+from util import get_serial, powerSave
 import gc
 
 #
@@ -25,6 +25,7 @@ import gc
 btnLeft = Pin(0, Pin.IN, Pin.PULL_DOWN)
 btnOK = Pin(1, Pin.IN, Pin.PULL_DOWN)
 btnRight = Pin(3, Pin.IN, Pin.PULL_DOWN)
+btnBack = Pin(7, Pin.IN, Pin.PULL_DOWN)
 ledRed = PWM(Pin(4))
 ledYellow = Pin(5, Pin.OUT)
 ledGreen = Pin(6, Pin.OUT)
@@ -63,7 +64,7 @@ menus = {
 		"focus": 0 # type: ignore
 	},
 	"settings": { # type: ignore
-		"items": ["ppm kalibrieren"], # type: ignore
+		"items": ["X Energiesparen", "Helligkeit: 100"], # type: ignore
 		"focus": 0 # type: ignore
 	},
 	"aps": { # type: ignore
@@ -79,6 +80,8 @@ currentMenu = "main"
 isInMenu = False
 # mainMenuItems = ["Temperatur", "pH-Wert", "World", "Version", "Credits"]
 # mainMenuFocus = 0
+
+secretCount = 0
 
 #
 # Networking
@@ -118,6 +121,8 @@ def askQuestion(men):
 	while True:
 		if btnOK.value():
 			break
+		if btnBack.value():
+			return -1
 		checkButtons()
 	return menus[currentMenu]["focus"]
 
@@ -209,8 +214,23 @@ def startMenuItem(item):
 	elif item == 0: # panels
 		while True:
 			drawPanels(oled, sensors, i2c, ledRed, ledYellow, ledGreen, display_width, display_height)
-			if not handlePanelButtons(btnLeft, btnOK, btnRight):
+			if not handlePanelButtons(btnLeft, btnOK, btnRight, btnBack):
 				break
+	elif item == 1: # settings
+		while True:
+			menus["settings"]["items"][0] = ("X" if powerSave() else "-") + " Energiesparen"
+			menus["settings"]["items"][1] = "Helligkeit " + str(int((brightness() / 255) * 100)) + "%"
+			option = askQuestion("settings")
+			if option == -1:
+				break
+			elif option == 0: # energy saver
+				powerSave(not powerSave())
+			elif option == 1:
+				current = (brightness() / 255) * 100
+				current = current - 20
+				if current < 0:
+					current = 100
+				brightness(int((current / 100) * 255))
 	# elif item == 3: # settings
 		# pass
 		# sett = askQuestion("settings")
@@ -256,13 +276,13 @@ def startMenuItem(item):
 				break
 		ledGreen.off()
 		if found == None:
-			ledRed.on()
+			ledRed.duty_u16(255*255)
 			oled.fill(0)
 			oled.text("No AP found", 0, 0)
 			oled.show()
 			nic.active(False)
 			time.sleep(1)
-			ledRed.off()
+			ledRed.duty_u16(0)
 			return
 		oled.fill(0)
 		# oled.text("Connecting...", 0, 0)
@@ -303,8 +323,9 @@ def startMenuItem(item):
 				continue
 			menus["scripts"]["items"].append(file.replace(".py", ""))
 		script = askQuestion("scripts")
-		print("Running script from /user/" + menus["scripts"]["items"][script] + ".py")
-		exec(open("/user/" + menus["scripts"]["items"][script] + ".py").read())
+		if not script == -1:
+			print("Running script from /user/" + menus["scripts"]["items"][script] + ".py")
+			exec(open("/user/" + menus["scripts"]["items"][script] + ".py").read())
 	else: # Not implemented
 		oled.fill(0)
 		oled.text("Not Implemented", 0, 0)
@@ -357,7 +378,7 @@ drawMenu()
 time.sleep(btnSleep)
 
 def checkButtons():
-	global isInMenu, menuShift, menus
+	global isInMenu, menuShift, menus, secretCount
 	isAnyButtonPressed = btnLeft.value() or btnOK.value() or btnRight.value()
 	navigationButton = "up" if btnLeft.value() else "down" if btnRight.value() else None
 	items = menus[currentMenu]["items"]
@@ -381,6 +402,16 @@ def checkButtons():
 		time.sleep(btnSleep)
 		switchMenu("main")
 		# drawMenu()
+	elif btnBack.value(): # secret
+		secretCount = secretCount + 1
+		print(secretCount)
+		if secretCount == 10:
+			oled.fill(0)
+			oled.text("BOO!", 0, 0)
+			oled.show()
+			time.sleep(3)
+			drawMenu()
+		time.sleep(btnSleep)
 
 while True:
 	checkButtons()

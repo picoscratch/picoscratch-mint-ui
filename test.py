@@ -9,6 +9,7 @@ import dftds # TDS/ppm library
 btnLeft = Pin(0, Pin.IN, Pin.PULL_DOWN)
 btnOK = Pin(1, Pin.IN, Pin.PULL_DOWN)
 btnRight = Pin(3, Pin.IN, Pin.PULL_DOWN)
+btnBack = Pin(7, Pin.IN, Pin.PULL_DOWN)
 ledRed = Pin(4, Pin.OUT)
 ledYellow = Pin(5, Pin.OUT)
 ledGreen = Pin(6, Pin.OUT)
@@ -17,7 +18,7 @@ display_width = 128 # SSD1306 width
 display_height = 64   # SSD1306 height
 TEST_DELAY = 0.5
 
-screen_i2c = I2C(1,scl=Pin(27),sda=Pin(26))
+screen_i2c = I2C(1,scl=Pin(19),sda=Pin(18))
 
 oled = SSD1306_I2C(display_width, display_height, screen_i2c)
 
@@ -69,6 +70,13 @@ oled.text("Press OK", 0, 10, 1)
 oled.show()
 while True:
 	if btnOK.value() == 1:
+		break
+oled.fill(0)
+oled.text("Taster", 0, 0, 1)
+oled.text("Press BACK", 0, 10, 1)
+oled.show()
+while True:
+	if btnBack.value() == 1:
 		break
 
 for i in range(0, 5):
