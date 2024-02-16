@@ -54,12 +54,12 @@ sensors = {
 		"warn": 30,
 		"bad": 40
 	},
-	"ppm": {
+	"tds": {
 		"read": get_tds,
 		"unit": "ppm",
 		"min": 0,
 		"max": 500,
-		"friendlyName": "ppm",
+		"friendlyName": "TDS",
 		"toolow": 70,
 		"good": 80,
 		"warn": 200,
