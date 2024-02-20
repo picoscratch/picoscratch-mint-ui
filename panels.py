@@ -206,6 +206,7 @@ def drawPanels(oled, sensors, i2c, ledRed, ledYellow, ledGreen, display_width, d
 		oled.text("Verbinde einen", 5, 5+h)
 		oled.text("Sensor", 5, 15+h)
 	oled.show()
+	return sensors
 
 def handlePanelButtons(btnLeft, btnOK, btnRight, btnBack):
 	global selectedPanel

@@ -16,7 +16,7 @@ import select
 import os
 from panels import drawPanels, handlePanelButtons
 from sensor import sensors
-from util import get_serial, powerSave
+from util import get_serial, powerSave, mergeDicts, randomString
 import gc
 
 #
@@ -80,6 +80,7 @@ currentMenu = "main"
 isInMenu = False
 # mainMenuItems = ["Temperatur", "pH-Wert", "World", "Version", "Credits"]
 # mainMenuFocus = 0
+sensorData = []
 
 secretCount = 0
 
@@ -212,10 +213,41 @@ def startMenuItem(item):
 	#		oled.show()
 	#		time.sleep(0.3)
 	elif item == 0: # panels
+		sensorData = ["Zeit"]
+		counter = 0
+		for sensor in sensors:
+			sensorData[0] = sensorData[0] + "," + sensors[sensor]["friendlyName"]
 		while True:
-			drawPanels(oled, sensors, i2c, ledRed, ledYellow, ledGreen, display_width, display_height)
+			counter = counter + 1
+			data = drawPanels(oled, sensors, i2c, ledRed, ledYellow, ledGreen, display_width, display_height)
+			if counter == 3: # with 0.3s sleep, this is every second
+				currentTime = time.localtime() # touple: (year, month, day, hour, minute, second, weekday, yearday)
+				currentTime = str(currentTime[3]) + ":" + str(currentTime[4]) + ":" + str(currentTime[5])
+				newData = currentTime
+				for sensor in data:
+					if sensor["value"] == None:
+						newData = newData + ",-"
+					else:
+						newData = newData + "," + str(sensor["value"])
+				sensorData.append(newData)
+				counter = 0
 			if not handlePanelButtons(btnLeft, btnOK, btnRight, btnBack):
 				break
+		oled.fill(0)
+		oled.text("Speichern...", 0, 0)
+		oled.show()
+		# currentTime = time.localtime() # touple: (year, month, day, hour, minute, second, weekday, yearday)
+		# filename = "user/" + str(currentTime[0]) + "-" + str(currentTime[1]) + "-" + str(currentTime[2]) + "-" + str(currentTime[3]) + "-" + str(currentTime[4]) + str(currentTime[5]) + ".csv"
+		filename = "user/" + randomString(5) + ".csv"
+		with open(filename, "w") as f:
+			for line in sensorData:
+				f.write(line + "\n")
+			f.close()
+		oled.fill(0)
+		oled.text("Gespeichert unter", 0, 0)
+		oled.text(filename, 0, 15)
+		oled.show()
+		time.sleep(2)
 	elif item == 1: # settings
 		while True:
 			menus["settings"]["items"][0] = ("X" if powerSave() else "-") + " Energiesparen"

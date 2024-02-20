@@ -5,14 +5,9 @@ import json
 import select
 import sys
 from sensor import read_sensors
-from util import get_serial
+from util import get_serial, mergeDicts
 import socket
 import network
-
-def mergeDicts(x, y):
-	z = x.copy()   # start with keys and values of x
-	z.update(y)    # modifies z with keys and values of y
-	return z
 
 def handlePacket(data):
 	if data["type"] == "list_files":

@@ -17,3 +17,12 @@ def powerSave(value=None):
 			pin.value(0)
 		else:
 			pin.value(1)
+
+def mergeDicts(x, y):
+	z = x.copy()   # start with keys and values of x
+	z.update(y)    # modifies z with keys and values of y
+	return z
+
+def randomString(length):
+	import random
+	return ''.join(random.choice('0123456789ABCDEF') for i in range(length))
