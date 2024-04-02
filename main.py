@@ -74,6 +74,10 @@ menus = {
 	"scripts": {
 		"items": [], # type: ignore
 		"focus": 0 # type: ignore
+	},
+	"debug": {
+		"items": ["Close", "Bootloader"],
+		"focus": 0
 	}
 }
 currentMenu = "main"
@@ -117,15 +121,18 @@ def trafficLight(value, goodlvl, warnlvl, badlvl, toolowlvl=0):
 		ledGreen.off()
 
 def askQuestion(men):
+	curMenu = currentMenu
 	switchMenu(men)
 	time.sleep(btnSleep)
 	while True:
 		if btnOK.value():
 			break
 		if btnBack.value():
+			switchMenu(curMenu)
 			return -1
 		checkButtons()
-	return menus[currentMenu]["focus"]
+	switchMenu(curMenu)
+	return menus[men]["focus"]
 
 def drawMenu():
 	lineskip = 15
@@ -438,12 +445,24 @@ def checkButtons():
 		secretCount = secretCount + 1
 		print(secretCount)
 		if secretCount == 10:
-			oled.fill(0)
-			oled.text("BOO!", 0, 0)
-			oled.show()
+			#oled.fill(0)
+			#oled.text("BOO!", 0, 0)
+			#oled.show()
+			import test
+			debug()
 			time.sleep(3)
 			drawMenu()
 		time.sleep(btnSleep)
+
+def debug():
+	menu = askQuestion("debug")
+	print(menu)
+	if menu == 1:
+		oled.fill(0)
+		oled.text("Bootloader", 0, 0)
+		oled.text("Flash firmware", 0, 15)
+		oled.show()
+		machine.bootloader()
 
 while True:
 	checkButtons()

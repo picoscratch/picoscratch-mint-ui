@@ -3,8 +3,6 @@ from machine import Pin, I2C, ADC, PWM
 from sh1106 import SH1106_I2C as SSD1306_I2C
 import framebuf,sys
 import time
-from psds1820 import get_temp
-import dftds # TDS/ppm library
 
 btnLeft = Pin(0, Pin.IN, Pin.PULL_DOWN)
 btnOK = Pin(1, Pin.IN, Pin.PULL_DOWN)
@@ -78,36 +76,5 @@ oled.show()
 while True:
 	if btnBack.value() == 1:
 		break
-
-for i in range(0, 5):
-	oled.fill(0)
-	oled.text("Temperatur", 0, 0, 1)
-	oled.text(str(get_temp()), 0, 10, 1)
-	oled.show()
-	time.sleep(TEST_DELAY)
-
-def get_tds():
-	try:
-		tds_sensor = dftds.GravityTDS(28, adc_range=65535, k_value_repository=dftds.KValueRepositoryFlash("tds_calibration.json"))
-		tds_sensor.begin()
-		temp = get_temp()
-		if temp == None:
-			# tds_sensor.temperature = 25
-			return None
-		# else:
-		tds_sensor.temperature = temp
-		# tds_sensor.temperature = get_temp() # type: ignore
-		tds_value = tds_sensor.update()
-		return float('{0:.2g}'.format(tds_value))
-	except:
-		return None
-
-for i in range(0, 5):
-	oled.fill(0)
-	oled.text("TDS", 0, 0, 1)
-	oled.text(str(get_tds()), 0, 10, 1)
-	oled.show()
-	time.sleep(TEST_DELAY)
-
 oled.fill(0)
 oled.show()

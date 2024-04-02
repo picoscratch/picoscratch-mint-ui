@@ -2,6 +2,8 @@ from machine import Pin, I2C
 #from ssd1306 import SSD1306_I2C
 from sh1106 import SH1106_I2C as SSD1306_I2C
 import framebuf
+import sys
+import random
 
 display_width = 128 # SSD1306 width
 display_height = 64   # SSD1306 height
@@ -33,6 +35,16 @@ def invertArea(oled, x, y, w, h):
 	for i in range(w):
 		for j in range(h):
 			oled.pixel(x+i, y+j, not oled.pixel(x+i, y+j))
+
+def randomPixels(oled):
+	for x in range(display_width):
+		for y in range(display_height):
+			oled.pixel(x, y, random.randint(0, 1))
+	oled.show()
+
+if sys.platform != "mint":
+	randomPixels(oled)
+	raise OSError("Display error")
 
 def readPBM(filename):
 	with open(filename, "rb") as f:

@@ -5,13 +5,13 @@ ds_pin = machine.Pin(2) # CHANGE THIS
  
 ds_sensor = ds18x20.DS18X20(onewire.OneWire(ds_pin))
 
-def get_temp():
+def get_temp(idx):
 	roms = ds_sensor.scan()
 	if len(roms) == 0:
 		return None
 	ds_sensor.convert_temp()
 	try:
-		temp = ds_sensor.read_temp(roms[0])
+		temp = ds_sensor.read_temp(roms[idx])
 		return float('{0:.2g}'.format(temp))
 	except:
 		return None

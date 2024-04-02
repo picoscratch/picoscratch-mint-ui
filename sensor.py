@@ -42,9 +42,12 @@ def read_co2():
 	sensor = MH_Z19(Pin(8), Pin(9), 1)
 	return sensor.read_co2()
 
+def get_temp_0():
+	return get_temp(0)
+
 sensors = {
 	"temp": {
-		"read": get_temp,
+		"read": get_temp_0,
 		"unit": "*C",
 		"min": -10,
 		"max": 40,
