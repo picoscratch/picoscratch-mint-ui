@@ -52,7 +52,7 @@ maxItems = 4
 # Menus
 menus = {
 	"main": { # type: ignore
-		"items": ["Panels", "Einstellungen", "Test", "Skripte", "Version", "Netzwerkausgang", "USB-Ausgang"], # type: ignore
+		"items": ["Panels", "Einstellungen", "Meldungen", "Skripte", "Version", "Netzwerkausgang", "USB-Ausgang"], # type: ignore
 		"focus": 0 # type: ignore
 	},
 	"save": { # type: ignore
@@ -74,10 +74,6 @@ menus = {
 	"scripts": {
 		"items": [], # type: ignore
 		"focus": 0 # type: ignore
-	},
-	"debug": {
-		"items": ["Close", "Bootloader"],
-		"focus": 0
 	}
 }
 currentMenu = "main"
@@ -121,18 +117,15 @@ def trafficLight(value, goodlvl, warnlvl, badlvl, toolowlvl=0):
 		ledGreen.off()
 
 def askQuestion(men):
-	curMenu = currentMenu
 	switchMenu(men)
 	time.sleep(btnSleep)
 	while True:
 		if btnOK.value():
 			break
 		if btnBack.value():
-			switchMenu(curMenu)
 			return -1
 		checkButtons()
-	switchMenu(curMenu)
-	return menus[men]["focus"]
+	return menus[currentMenu]["focus"]
 
 def drawMenu():
 	lineskip = 15
@@ -246,10 +239,10 @@ def startMenuItem(item):
 		# currentTime = time.localtime() # touple: (year, month, day, hour, minute, second, weekday, yearday)
 		# filename = "user/" + str(currentTime[0]) + "-" + str(currentTime[1]) + "-" + str(currentTime[2]) + "-" + str(currentTime[3]) + "-" + str(currentTime[4]) + str(currentTime[5]) + ".csv"
 		filename = "user/" + randomString(5) + ".csv"
-		with open(filename, "w") as f:
-			for line in sensorData:
-				f.write(line + "\n")
-			f.close()
+		#with open(filename, "w") as f:
+		#	for line in sensorData:
+		#		f.write(line + "\n")
+		#	f.close()
 		oled.fill(0)
 		oled.text("Gespeichert unter", 0, 0)
 		oled.text(filename, 0, 15)
@@ -351,8 +344,9 @@ def startMenuItem(item):
 		# menus["main"]["focus"] = 0
 		from packetjob import serialThread
 		serialThread(btnOK, nic)
-	elif item == 2: # test
-		import test
+	elif item == 2: # alerts
+		from alerts import showAlerts
+		showAlerts()
 	elif item == 3: # scripts
 		files = os.listdir("/user")
 		menus["scripts"]["items"] = []
