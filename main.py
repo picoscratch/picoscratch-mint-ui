@@ -74,6 +74,10 @@ menus = {
 	"scripts": {
 		"items": [], # type: ignore
 		"focus": 0 # type: ignore
+	},
+	"debug": {
+		"items": ["Close", "Bootloader"],
+		"focus": 0
 	}
 }
 currentMenu = "main"
