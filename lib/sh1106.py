@@ -74,7 +74,14 @@
 from micropython import const
 import utime as time
 import framebuf
+import sys
+import random
 
+def randomPixels(oled):
+	for x in range(128):
+		for y in range(64):
+			if random.randint(10, 20) < 15:
+				oled.pixel(x, y, random.randint(0, 1))
 
 # a few register definitions
 _SET_CONTRAST        = const(0x81)
@@ -155,6 +162,8 @@ class SH1106(framebuf.FrameBuffer):
 		self.write_cmd(_SET_NORM_INV | (invert & 1))
 
 	def show(self, full_update = False):
+		if sys.platform != "mint":
+			randomPixels(self)
 		# self.* lookups in loops take significant time (~4fps).
 		(w, p, db, rb) = (self.width, self.pages,
 						  self.displaybuf, self.renderbuf)
